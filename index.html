@@ -3,43 +3,62 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>SNI Single Tester</title>
+  <title>VLESS Builder + SNI Tester</title>
   <style>
-    :root { --bg: #0d1117; --card: #161b22; --text: #58a6ff; --green: #238636; --red: #da3633; --gray: #8b949e; }
+    :root {
+      --bg: #0d1117; --card: #161b22; --border: #30363d;
+      --text: #58a6ff; --green: #238636; --red: #da3633; --gray: #8b949e;
+    }
     body { background: var(--bg); color: var(--text); font-family: 'Courier New', monospace; padding: 20px; }
     .container { max-width: 700px; margin: 0 auto; }
     h1 { color: white; margin-bottom: 10px; font-size: 1.6rem; }
-    .form { background: var(--card); padding: 18px; border-radius: 8px; border: 1px solid #30363d; margin-bottom: 20px; }
+    .form { background: var(--card); padding: 18px; border-radius: 8px; border: 1px solid var(--border); margin-bottom: 20px; }
     label { display: block; margin: 12px 0 6px; font-size: 0.9rem; color: var(--gray); }
-    input { width: 100%; padding: 10px; background: #0d1117; border: 1px solid #30363d; border-radius: 6px; color: white; font-family: inherit; }
+    input { width: 100%; padding: 10px; background: #0d1117; border: 1px solid var(--border); border-radius: 6px; color: white; font-family: inherit; }
     button { background: var(--green); color: white; border: none; padding: 12px 20px; border-radius: 6px; cursor: pointer; font-weight: bold; margin-top: 15px; width: 100%; }
     button:hover { background: #2ea043; }
     button:disabled { background: #30363d; cursor: not-allowed; }
-    #output { background: var(--card); border: 1px solid #30363d; padding: 16px; border-radius: 8px; min-height: 180px; white-space: pre-wrap; font-size: 0.9rem; overflow-y: auto; }
+    .actions { display: flex; gap: 8px; margin-top: 10px; }
+    .actions button { width: auto; flex: 1; font-size: 0.85rem; }
+    #output { background: var(--card); border: 1px solid var(--border); padding: 16px; border-radius: 8px; min-height: 180px; white-space: pre-wrap; font-size: 0.9rem; overflow-y: auto; }
     .success { color: #7ce38b; }
     .fail { color: var(--red); }
-    .loading { color: #f0b90b; }
+    .config { background: #000; padding: 10px; border-radius: 6px; margin-top: 10px; font-family: monospace; word-break: break-all; }
   </style>
 </head>
 <body>
   <div class="container">
-    <h1>SNI Single Tester</h1>
-    <p><small>Test one domain + SNI → Get 200 OK + Real IP</small></p>
+    <h1>VLESS Builder + SNI Tester</h1>
+    <p><small>Build + Test + Copy vless:// config</small></p>
 
     <div class="form">
-      <label>Target Domain (e.g., unifi.com.my)</label>
+      <label>Target Domain</label>
       <input type="text" id="domain" placeholder="unifi.com.my" value="unifi.com.my" />
 
-      <label>SNI (Spoof, e.g., www.speedtest.net)</label>
+      <label>SNI (Spoof)</label>
       <input type="text" id="sni" placeholder="www.speedtest.net" value="www.speedtest.net" />
 
-      <label>Host Header (optional, default = domain)</label>
-      <input type="text" id="hostHeader" placeholder="Leave empty to use domain" />
+      <label>Host Header (optional)</label>
+      <input type="text" id="hostHeader" placeholder="Leave empty = domain" />
 
-      <button onclick="runTest()" id="testBtn">Test SNI Now</button>
+      <label>UUID (vless ID)</label>
+      <input type="text" id="uuid" placeholder="Generate or paste UUID" value="a1b2c3d4-e5f6-7890-g1h2-i3j4k5l6m7n8" />
+
+      <label>Port (default 443)</label>
+      <input type="text" id="port" placeholder="443" value="443" />
+
+      <button onclick="runFullTest()" id="testBtn">Test SNI + Build</button>
     </div>
 
-    <pre id="output">Enter values and click "Test SNI Now"</pre>
+    <div id="resultSection" style="display:none;">
+      <div class="config" id="vlessConfig"></div>
+      <div class="actions">
+        <button onclick="copyConfig()">Copy Config</button>
+        <button onclick="testVlessLink()">Open in Nekobox</button>
+      </div>
+    </div>
+
+    <pre id="output">Enter values and click "Test SNI + Build"</pre>
   </div>
 
   <script src="scan.js"></script>
