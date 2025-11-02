@@ -4,8 +4,8 @@
 # =====================================================
 
 api.useinsider.com
-unifi.com.my
 www.speedtest.net
+unifi.com.my
 fast.com
 cloudflare.com
 grab.com
