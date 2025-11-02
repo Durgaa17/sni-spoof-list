@@ -4,8 +4,9 @@ export const EXTERNAL_APIS = {
         BASE_URL: 'https://check-host.net',
         ENDPOINTS: {
             PING: '/check-ping',
-            HTTP: '/check-http', 
-            TCP: '/check-tcp'
+            HTTP: '/check-http',
+            TCP: '/check-tcp',
+            DNS: '/check-dns'
         }
     }
 };
