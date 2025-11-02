@@ -1,15 +1,28 @@
+// Import path configuration
+import { MODULE_PATHS } from './path.js';
+
 class HomePage {
     constructor() {
         this.toolsGrid = document.getElementById('toolsGrid');
         this.contentArea = document.getElementById('contentArea');
+        
+        // Use paths from path.js - much cleaner!
         this.tools = [
             {
                 id: 'vless-stripper',
                 title: 'VLESS Stripper',
                 icon: '⚡',
                 description: 'Strip VLESS configurations to basic parameters',
-                module: 'tools/stripper.js'  // Remove ./ prefix
+                module: MODULE_PATHS.TOOLS.VLESS_STRIPPER
             }
+            // Add new tools like this:
+            // {
+            //     id: 'config-validator',
+            //     title: 'Config Validator', 
+            //     icon: '✅',
+            //     description: 'Validate your configurations',
+            //     module: MODULE_PATHS.TOOLS.CONFIG_VALIDATOR
+            // }
         ];
         
         this.init();
@@ -63,7 +76,7 @@ class HomePage {
                 </div>
             `;
 
-            // Load the tool module - use relative path from current directory
+            // Load the tool module using the path from configuration
             const module = await import('./' + tool.module);
             
             // Clear content
@@ -90,7 +103,7 @@ class HomePage {
                     <h3>Failed to load tool</h3>
                     <p>${error.message}</p>
                     <p style="font-size: 0.9rem; color: #888; margin-top: 10px;">
-                        File path: ${tool.module}
+                        File: ${tool.module}
                     </p>
                     <button class="back-btn" onclick="homePage.showHome()">Back to Home</button>
                 </div>
