@@ -1,51 +1,31 @@
-// shared/connection-tester.js - Simplified API-only testing
-import { testHostReachability } from './ping-tester.js';
-import { testPortConnectivity } from './port-tester.js';
-import { quickConnectionTest } from './external/check-host-api.js';
+// shared/connection-tester.js - Simplified with new implementation
+import { quickConnectionTest } from './external/simple-connection-tester.js';
 
-export async function testConnection(configAnalysis, useExternalAPI = true) {
-    const results = {
-        method: 'external_api', // Always use API for reliable testing
-        externalResults: null,
-        overall: 'unknown',
-        timestamp: new Date().toISOString(),
-        configType: getConfigType(configAnalysis)
-    };
-
+export async function testConnection(configAnalysis) {
+    console.log(`🔍 Testing connection for: ${configAnalysis.server}:${configAnalysis.port}`);
+    
     try {
-        console.log('Using Check-Host.net API for reliable connection testing...');
-        
-        results.externalResults = await quickConnectionTest(
+        const connectionResult = await quickConnectionTest(
             configAnalysis.server, 
             configAnalysis.port
         );
         
-        results.overall = determineOverallStatusFromExternal(results.externalResults);
+        return {
+            method: 'browser_direct',
+            result: connectionResult,
+            overall: connectionResult.overall,
+            timestamp: new Date().toISOString()
+        };
         
     } catch (error) {
-        console.log('External API failed:', error);
-        results.overall = 'error';
-        results.error = error.message;
-    }
-
-    return results;
-}
-
-function getConfigType(analysis) {
-    return analysis.security === 'tls' ? 'https' : 'http';
-}
-
-function determineOverallStatusFromExternal(externalResults) {
-    if (!externalResults) return 'error';
-    
-    const { ping, tcp, http } = externalResults;
-    
-    if (ping?.success && tcp?.success) {
-        return 'healthy';
-    } else if (!ping?.success) {
-        return 'host_unreachable';
-    } else {
-        return 'port_unreachable';
+        console.error('Connection test failed:', error);
+        return {
+            method: 'browser_direct',
+            result: null,
+            overall: 'error',
+            error: error.message,
+            timestamp: new Date().toISOString()
+        };
     }
 }
 
@@ -53,61 +33,44 @@ export function generateConnectionReport(connectionResults) {
     if (!connectionResults || connectionResults.overall === 'error') {
         return {
             summary: 'Connection test failed',
-            details: 'External API is not responding',
+            details: 'Could not complete connection test',
             status: 'error',
-            method: 'external_api'
+            method: connectionResults?.method || 'unknown'
         };
     }
 
-    return generateExternalAPIReport(connectionResults);
-}
-
-function generateExternalAPIReport(connectionResults) {
-    const externalResults = connectionResults.externalResults;
+    const result = connectionResults.result;
     
-    if (!externalResults) {
+    if (!result || !result.summary) {
         return {
-            summary: 'External API unavailable',
-            details: 'Check-Host.net API is not responding',
-            status: 'error',
-            method: 'external_api'
+            summary: 'No test results',
+            details: 'Connection test did not return valid results',
+            status: 'unknown',
+            method: connectionResults.method
         };
     }
 
-    const { ping, tcp, http } = externalResults;
+    const summary = result.summary;
     
-    if (ping?.success && tcp?.success) {
-        const avgLatency = ping.summary?.averageLatency || tcp.summary?.averageLatency || 0;
-        const successRate = ping.summary?.successRate || tcp.summary?.successRate || 0;
-        
+    if (summary.reachable) {
         return {
-            summary: `✅ Connection Healthy (${Math.round(avgLatency)}ms avg)`,
-            details: `Tested from ${ping.summary?.totalNodes || 0} locations (${Math.round(successRate)}% success)`,
+            summary: `✅ Connection Healthy (${summary.latency}ms)`,
+            details: `Server reachable via ${summary.workingProtocol?.toUpperCase() || 'HTTPS'}`,
             status: 'success',
-            latency: avgLatency,
-            method: 'external_api',
-            nodesTested: ping.summary?.totalNodes || 0,
-            successRate: successRate
-        };
-    } else if (!ping?.success) {
-        return {
-            summary: '❌ Host Unreachable',
-            details: 'Server not reachable from test locations',
-            status: 'error',
-            method: 'external_api'
+            latency: summary.latency,
+            method: connectionResults.method,
+            protocol: summary.workingProtocol
         };
     } else {
         return {
-            summary: '⚠️ Port Not Reachable',
-            details: 'Server is reachable but port is not responding',
-            status: 'warning', 
-            method: 'external_api'
+            summary: '❌ Connection Failed',
+            details: summary.details || 'Server is not reachable',
+            status: 'error',
+            method: connectionResults.method,
+            error: summary.error
         };
     }
 }
 
-// Remove unused functions:
-// - generateMixedContentReport
-// - generateFallbackReport  
-// - determineOverallStatusFromFallback
-// - shouldUseExternalAPI
+// Remove all Check-Host.net related functions
+export { quickConnectionTest } from './external/simple-connection-tester.js';
