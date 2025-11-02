@@ -1,10 +1,13 @@
-// scan.js – VLESS Builder + SNI Test + Copy + Open
+// scan.js – VLESS Builder + SNI Test + Copy + Open (FIXED)
 const output = document.getElementById('output');
 const testBtn = document.getElementById('testBtn');
 const resultSection = document.getElementById('resultSection');
 const vlessConfig = document.getElementById('vlessConfig');
 
 let currentVlessLink = '';
+
+// CORS Proxy (free, public)
+const PROXY = 'https://api.allorigins.win/raw?url=';
 
 async function log(msg) {
   output.innerHTML += msg + '\n';
@@ -26,29 +29,42 @@ async function getRealIP(domain) {
   }
 }
 
-async function testSNI(domain, sni, hostHeader) {
-  try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 8000);
-    const start = performance.now();
+async function testSNI(domain, sni) {
+  const url = `https://${domain}`;
+  const proxyUrl = `${PROXY}${encodeURIComponent(url)}`;
 
-    await fetch(`https://${domain}`, {
-      headers: { 'Host': sni },
-      signal: controller.signal,
-      mode: 'no-cors'
+  try {
+    const start = performance.now();
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10000);
+
+    const res = await fetch(proxyUrl, {
+      method: 'GET',
+      headers: {
+        'Host': sni,
+        'Origin': 'https://durgaa17.github.io',
+        'User-Agent': 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36'
+      },
+      signal: controller.signal
     });
 
     clearTimeout(timeout);
     const time = ((performance.now() - start) / 1000).toFixed(2);
-    return { success: true, time, ip: await getRealIP(domain) };
+    const ip = await getRealIP(domain);
+
+    if (res.ok) {
+      return { success: true, time, ip };
+    } else {
+      return { success: false, time, ip };
+    }
   } catch (e) {
-    return { success: false, time: 'N/A', ip: await getRealIP(domain) };
+    const ip = await getRealIP(domain);
+    return { success: false, time: 'N/A', ip };
   }
 }
 
 async function runFullTest() {
   clearOutput();
-  resultSection.style.display = 'none';
 
   const domain = document.getElementById('domain').value.trim();
   const sni = document.getElementById('sni').value.trim();
@@ -63,9 +79,9 @@ async function runFullTest() {
 
   testBtn.disabled = true;
   testBtn.textContent = 'Testing SNI...';
-  log(`Testing: ${domain} → SNI: ${sni} | Host: ${hostHeader}\n`);
+  log(`Testing: ${domain}\nSNI: ${sni}\nHost: ${hostHeader}\n`);
 
-  const result = await testSNI(domain, sni, hostHeader);
+  const result = await testSNI(domain, sni);
 
   log(`Result: <span class="${result.success ? 'success' : 'fail'}">${result.success ? '200 OK' : 'BLOCKED'}</span>`);
   log(`Time: ${result.time}s`);
@@ -96,7 +112,7 @@ function copyConfig() {
   });
 }
 
-// OPEN IN NEKOBOX / v2RAYNG
+// OPEN IN NEKOBOX
 function testVlessLink() {
   const nekobox = `nekobox://import?url=${encodeURIComponent(currentVlessLink)}`;
   window.open(nekobox, '_blank');
