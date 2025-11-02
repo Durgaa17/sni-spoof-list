@@ -13,31 +13,6 @@ class VlessStripper {
     initEventListeners() {
         this.stripBtn.addEventListener('click', () => this.stripConfig());
         this.copyBtn.addEventListener('click', () => this.copyToClipboard());
-        
-        // Auto-strip when paste happens
-        this.configInput.addEventListener('paste', (e) => {
-            setTimeout(() => {
-                this.stripConfig();
-            }, 100);
-        });
-
-        // Auto-strip when typing VLESS URL pattern
-        this.configInput.addEventListener('input', (e) => {
-            const value = e.target.value.trim();
-            if (value.startsWith('vless://') && value.length > 60) {
-                setTimeout(() => {
-                    this.stripConfig();
-                }, 500);
-            }
-        });
-
-        // Handle Enter key in textarea
-        this.configInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
-                e.preventDefault();
-                this.stripConfig();
-            }
-        });
     }
 
     stripConfig() {
@@ -45,111 +20,102 @@ class VlessStripper {
         
         if (!input) {
             this.showMessage('Please paste a VLESS configuration', 'error');
-            this.hideOutput();
             return;
         }
 
-        // Show loading state
-        this.setButtonLoading(this.stripBtn, true);
-
-        setTimeout(() => {
-            try {
-                const stripped = this.processVlessConfig(input);
-                this.strippedConfig.textContent = stripped;
-                this.showOutput();
-                this.showMessage('Configuration stripped successfully!', 'success');
-            } catch (error) {
-                this.showMessage(`Error: ${error.message}`, 'error');
-                this.hideOutput();
-                console.error('Stripping error:', error);
-            } finally {
-                this.setButtonLoading(this.stripBtn, false);
-            }
-        }, 300);
+        try {
+            const stripped = this.processVlessConfig(input);
+            this.strippedConfig.textContent = stripped;
+            this.outputSection.style.display = 'block';
+            this.showMessage('Configuration stripped successfully!', 'success');
+        } catch (error) {
+            this.showMessage('Error: Invalid VLESS configuration', 'error');
+            this.outputSection.style.display = 'none';
+        }
     }
 
     processVlessConfig(config) {
-        // Remove any quotes and trim
-        config = config.replace(/["']/g, '').trim();
+        // Clean the input
+        config = config.trim().replace(/["']/g, '');
         
-        // Check if it's a URL format
-        if (config.startsWith('vless://')) {
-            return this.parseVlessUrl(config);
+        if (!config.startsWith('vless://')) {
+            throw new Error('Not a VLESS configuration');
         }
+
+        // Parse the URL
+        const url = new URL(config);
+        const uuid = url.username;
+        const server = url.hostname;
+        const port = url.port;
+
+        // Get parameters (from search or hash)
+        const params = url.search || url.hash.replace('#', '?');
+        const searchParams = new URLSearchParams(params);
+
+        // Essential parameters in priority order
+        const essentialParams = [
+            'encryption',
+            'security', 
+            'type',
+            'sni',
+            'host',
+            'path',
+            'flow'
+        ];
+
+        // Build new URL with only essential parameters
+        let newParams = new URLSearchParams();
         
-        throw new Error('Please use VLESS URL format starting with vless://');
+        for (const param of essentialParams) {
+            const value = searchParams.get(param);
+            if (value) {
+                newParams.set(param, value);
+            }
+        }
+
+        // Set default encryption if not present
+        if (!newParams.get('encryption')) {
+            newParams.set('encryption', 'none');
+        }
+
+        // Build the stripped configuration
+        const stripped = `vless://${uuid}@${server}:${port}?${newParams.toString()}`;
+        return stripped;
     }
 
-    parseVlessUrl(url) {
-        try {
-            // Clean the URL - handle both ? and # parameters
-            let cleanUrl = url;
-            
-            // If URL has # but no ?, replace # with ? for proper parsing
-            if (url.includes('#') && !url.includes('?')) {
-                cleanUrl = url.replace('#', '?');
-            }
-            
-            const parsed = new URL(cleanUrl);
-            
-            // Extract basic components
-            const uuid = parsed.username;
-            const server = parsed.hostname;
-            const port = parsed.port;
-            
-            // Get parameters from search OR hash
-            const searchParams = parsed.searchParams;
-            const hashParams = new URLSearchParams(parsed.hash.substring(1));
-            const params = searchParams.toString() ? searchParams : hashParams;
-            
-            // Essential parameters based on your examples
-            const type = params.get('type') || 'tcp';
-            const security = params.get('security') || 'none';
-            const encryption = params.get('encryption') || 'none';
-            const path = params.get('path');
-            const host = params.get('host');
-            const sni = params.get('sni');
-            
-            // Build stripped configuration - optimized for your use cases
-            let stripped = `vless://${uuid}@${server}:${port}?`;
-            
-            // Add essential parameters in optimal order
-            const essentialParams = [];
-            
-            // Always include encryption and security
-            essentialParams.push(`encryption=${encryption}`);
-            essentialParams.push(`security=${security}`);
-            
-            // Add type
-            essentialParams.push(`type=${type}`);
-            
-            // Add WebSocket specific parameters if type is ws
-            if (type === 'ws') {
-                if (host) {
-                    essentialParams.push(`host=${encodeURIComponent(host)}`);
-                }
-                if (path) {
-                    essentialParams.push(`path=${encodeURIComponent(path)}`);
-                }
-            }
-            
-            // Add TLS specific parameters
-            if (security === 'tls' && sni) {
-                essentialParams.push(`sni=${encodeURIComponent(sni)}`);
-            }
-            
-            // Join all parameters
-            stripped += essentialParams.join('&');
-            
-            return stripped;
-            
-        } catch (error) {
-            console.error('URL parsing error:', error);
-            throw new Error('Invalid VLESS URL format');
-        }
-    }
-
-    async copyToClipboard() {
+    copyToClipboard() {
         const text = this.strippedConfig.textContent;
         
-        if (!text)
+        if (!text) return;
+
+        // Create temporary textarea for copying
+        const textarea = document.createElement('textarea');
+        textarea.value = text;
+        document.body.appendChild(textarea);
+        textarea.select();
+        
+        try {
+            document.execCommand('copy');
+            this.showMessage('Copied to clipboard!', 'success');
+        } catch (err) {
+            this.showMessage('Failed to copy', 'error');
+        }
+        
+        document.body.removeChild(textarea);
+    }
+
+    showMessage(text, type) {
+        this.message.textContent = text;
+        this.message.className = type + ' message';
+        this.message.style.display = 'block';
+        
+        setTimeout(() => {
+            this.message.style.display = 'none';
+        }, 3000);
+    }
+}
+
+// Initialize when page loads
+document.addEventListener('DOMContentLoaded', () => {
+    new VlessStripper();
+});
