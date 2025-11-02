@@ -1,4 +1,6 @@
-// tools/stripper.js
+// tools/stripper.js - Main stripper logic
+import { analyzeConfig, generateAnalysisHTML, validateConfig } from './stripper-analysis.js';
+
 export default function initStripper(container) {
     console.log('VLESS Stripper tool loaded successfully!');
     
@@ -29,6 +31,13 @@ export default function initStripper(container) {
                 ↓
             </div>
             
+            <!-- Analysis Section -->
+            <div id="configAnalysis" style="display: none; margin-bottom: 20px; padding: 15px; background: #1a1a1a; border-radius: 5px; border-left: 4px solid #667eea;">
+                <h4 style="margin-bottom: 10px;">🔍 Configuration Analysis</h4>
+                <div id="analysisResult"></div>
+            </div>
+            
+            <!-- Stripped Output Section -->
             <div id="stripperOutput" class="stripper-output" style="display: none;">
                 <h4>✨ Stripped Configuration:</h4>
                 <pre class="stripper-result" id="stripperResult"></pre>
@@ -53,6 +62,8 @@ export default function initStripper(container) {
     const input = document.getElementById('stripperInput');
     const output = document.getElementById('stripperOutput');
     const result = document.getElementById('stripperResult');
+    const analysisDiv = document.getElementById('configAnalysis');
+    const analysisResult = document.getElementById('analysisResult');
     const errorMessage = document.getElementById('errorMessage');
 
     // Add event listeners
@@ -60,7 +71,7 @@ export default function initStripper(container) {
     copyBtn.addEventListener('click', copyStrippedConfig);
     clearBtn.addEventListener('click', clearAll);
 
-    // Auto-strip on paste with delay
+    // Auto-strip on paste
     input.addEventListener('paste', (e) => {
         setTimeout(() => {
             if (input.value.trim().startsWith('vless://')) {
@@ -69,42 +80,25 @@ export default function initStripper(container) {
         }, 100);
     });
 
-    // Enter key support
-    input.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
-            e.preventDefault();
-            stripVlessConfig();
-        }
-    });
-
     function showError(message) {
         errorMessage.textContent = message;
         errorMessage.style.display = 'block';
         output.style.display = 'none';
-        
-        setTimeout(() => {
-            errorMessage.style.display = 'none';
-        }, 5000);
-    }
-
-    function showSuccess(message) {
-        // You can add a success message area if needed
-        console.log('Success:', message);
+        analysisDiv.style.display = 'none';
     }
 
     function stripVlessConfig() {
         const inputText = input.value.trim();
         
-        // Hide previous errors
+        // Hide previous errors and analysis
         errorMessage.style.display = 'none';
+        analysisDiv.style.display = 'none';
+        output.style.display = 'none';
 
-        if (!inputText) {
-            showError('❌ Please paste a VLESS configuration');
-            return;
-        }
-
-        if (!inputText.startsWith('vless://')) {
-            showError('❌ This doesn\'t look like a VLESS configuration. Must start with "vless://"');
+        // Validate first
+        const validation = validateConfig(inputText);
+        if (!validation.isValid) {
+            showError('❌ ' + validation.errors.join(', '));
             return;
         }
 
@@ -112,12 +106,19 @@ export default function initStripper(container) {
             stripBtn.innerHTML = '⏳ Processing...';
             stripBtn.disabled = true;
 
-            // Small delay for better UX
             setTimeout(() => {
+                // Process configuration
                 const stripped = processVlessConfig(inputText);
+                
+                // Generate analysis
+                const analysis = analyzeConfig(inputText);
+                const analysisHTML = generateAnalysisHTML(analysis);
+                
+                // Display results
                 result.textContent = stripped;
+                analysisResult.innerHTML = analysisHTML;
+                analysisDiv.style.display = 'block';
                 output.style.display = 'block';
-                showSuccess('Configuration stripped successfully!');
                 
                 stripBtn.innerHTML = '🛠️ Strip Configuration';
                 stripBtn.disabled = false;
@@ -164,6 +165,7 @@ export default function initStripper(container) {
     function clearAll() {
         input.value = '';
         output.style.display = 'none';
+        analysisDiv.style.display = 'none';
         errorMessage.style.display = 'none';
         input.focus();
     }
@@ -171,26 +173,17 @@ export default function initStripper(container) {
     function processVlessConfig(config) {
         config = config.trim().replace(/["']/g, '');
         
-        if (!config.startsWith('vless://')) {
-            throw new Error('Invalid VLESS configuration format');
-        }
-
         // Parse URL
         const url = new URL(config);
         const uuid = url.username;
         const server = url.hostname;
         const port = url.port;
 
-        // Validate required fields
-        if (!uuid) throw new Error('Missing UUID in configuration');
-        if (!server) throw new Error('Missing server address');
-        if (!port) throw new Error('Missing port number');
-
         // Get parameters
         const params = new URLSearchParams(url.search);
         const essential = new URLSearchParams();
         
-        // Essential parameters to keep (in priority order)
+        // Essential parameters to keep
         const keepParams = [
             'encryption', 
             'security', 
@@ -213,11 +206,6 @@ export default function initStripper(container) {
         // Set default encryption if not present
         if (!essential.get('encryption')) {
             essential.set('encryption', 'none');
-        }
-
-        // Set default type if not present
-        if (!essential.get('type')) {
-            essential.set('type', 'tcp');
         }
         
         // Build the stripped configuration
