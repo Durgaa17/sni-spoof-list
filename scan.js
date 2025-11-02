@@ -1,134 +1,165 @@
-// scan.js – VLESS Builder v3.1 (TLS Only + IP + Ping)
-const output = document.getElementById('output');
-const testBtn = document.getElementById('testBtn');
-const resultSection = document.getElementById('resultSection');
-const vlessConfig = document.getElementById('vlessConfig');
-
-let currentVlessLink = '';
-
-const PROXY = 'https://api.allorigins.win/raw?url=';
-
-async function log(msg) {
-  output.innerHTML += msg + '\n';
-  output.scrollTop = output.scrollHeight;
-}
-
-function clearOutput() {
-  output.innerHTML = '';
-  resultSection.style.display = 'none';
-}
-
-async function getRealIP(domain) {
-  try {
-    const res = await fetch(`https://dns.google/resolve?name=${domain}&type=A`);
-    const data = await res.json();
-    return data.Answer?.[0]?.data || 'Unknown';
-  } catch {
-    return 'Unknown';
-  }
-}
-
-async function pingHost(host) {
-  try {
-    const start = performance.now();
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 5000);
-
-    await fetch(`https://${host}`, { signal: controller.signal, method: 'HEAD' });
-    const time = ((performance.now() - start) / 1000).toFixed(2);
-    return { alive: true, time };
-  } catch {
-    return { alive: false, time: 'N/A' };
-  }
-}
-
-async function testConnection(domain, port, sni) {
-  const url = `https://${domain}:${port}`;
-  const proxyUrl = `${PROXY}${encodeURIComponent(url)}`;
-
-  try {
-    const start = performance.now();
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 10000);
-
-    const res = await fetch(proxyUrl, {
-      method: 'HEAD',
-      headers: { 'Host': sni },
-      signal: controller.signal
-    });
-
-    clearTimeout(timeout);
-    const time = ((performance.now() - start) / 1000).toFixed(2);
-    const ip = await getRealIP(domain);
-
-    return { success: res.ok, time, ip };
-  } catch (e) {
-    const ip = await getRealIP(domain);
-    return { success: false, time: 'N/A', ip };
-  }
-}
-
-async function runFullTest() {
-  clearOutput();
-
-  const domain = document.getElementById('domain').value.trim();
-  const sni = document.getElementById('sni').value.trim();
-  const hostHeader = document.getElementById('hostHeader').value.trim() || domain;
-  const uuid = document.getElementById('uuid').value.trim();
-  const port = document.getElementById('port').value.trim() || '443';
-  const pingCheck = document.getElementById('pingCheck').checked;
-
-  if (!domain || !sni || !uuid) {
-    log('<span class="fail">Error: Domain, SNI, and UUID required</span>');
-    return;
-  }
-
-  testBtn.disabled = true;
-  testBtn.textContent = 'Testing...';
-  log(`Testing: ${domain}:${port}\nSNI: ${sni}\nHost: ${hostHeader}\n`);
-
-  if (pingCheck) {
-    const pingResult = await pingHost(hostHeader);
-    log(`Ping Check: ${pingResult.alive ? '<span class="success">Alive</span>' : '<span class="fail">Dead</span>'} (${pingResult.time}s)`);
-    if (!pingResult.alive) {
-      log('<span class="fail">Host may be down. Proceed with caution.</span>\n');
+class VlessStripper {
+    constructor() {
+        this.configInput = document.getElementById('configInput');
+        this.stripBtn = document.getElementById('stripBtn');
+        this.outputSection = document.getElementById('outputSection');
+        this.strippedConfig = document.getElementById('strippedConfig');
+        this.copyBtn = document.getElementById('copyBtn');
+        this.message = document.getElementById('message');
+        
+        this.initEventListeners();
     }
-  }
 
-  const result = await testConnection(domain, port, sni);
+    initEventListeners() {
+        this.stripBtn.addEventListener('click', () => this.stripConfig());
+        this.copyBtn.addEventListener('click', () => this.copyToClipboard());
+        
+        // Auto-strip when paste happens
+        this.configInput.addEventListener('paste', (e) => {
+            setTimeout(() => {
+                this.stripConfig();
+            }, 100);
+        });
+    }
 
-  log(`Result: <span class="${result.success ? 'success' : 'fail'}">${result.success ? '200 OK' : 'BLOCKED'}</span>`);
-  log(`Time: ${result.time}s`);
-  log(`Real IP: ${result.ip}\n`);
+    stripConfig() {
+        const input = this.configInput.value.trim();
+        
+        if (!input) {
+            this.showMessage('Please paste a VLESS configuration', 'error');
+            this.hideOutput();
+            return;
+        }
 
-  const vless = `vless://${uuid}@${domain}:${port}?type=ws&security=tls&sni=${sni}&host=${hostHeader}#MY-ZT`;
-  currentVlessLink = vless;
+        try {
+            const stripped = this.processVlessConfig(input);
+            this.strippedConfig.textContent = stripped;
+            this.showOutput();
+            this.showMessage('Configuration stripped successfully!', 'success');
+        } catch (error) {
+            this.showMessage('Error: Invalid VLESS configuration format', 'error');
+            this.hideOutput();
+            console.error('Stripping error:', error);
+        }
+    }
 
-  vlessConfig.textContent = vless;
-  resultSection.style.display = 'block';
+    processVlessConfig(config) {
+        // Remove any quotes and trim
+        config = config.replace(/["']/g, '').trim();
+        
+        // Check if it's a URL format
+        if (config.startsWith('vless://')) {
+            return this.parseVlessUrl(config);
+        }
+        
+        // If it's already a stripped format or raw parameters
+        return this.parseRawConfig(config);
+    }
 
-  if (result.success) {
-    log(`<span class="success">VLESS Ready!</span>`);
-  } else {
-    log(`<span class="fail">SNI blocked or connection failed.</span>`);
-  }
+    parseVlessUrl(url) {
+        try {
+            const parsed = new URL(url);
+            
+            // Extract basic components
+            const uuid = parsed.username;
+            const server = parsed.hostname;
+            const port = parsed.port;
+            const params = new URLSearchParams(parsed.hash.substring(1)); // Remove # from hash
+            
+            // Get type (default to tcp if not specified)
+            const type = params.get('type') || 'tcp';
+            
+            // Get security (default to none if not specified)
+            const security = params.get('security') || 'none';
+            
+            // Build stripped configuration
+            let stripped = `vless://${uuid}@${server}:${port}`;
+            stripped += `?type=${type}&security=${security}`;
+            
+            // Add path for ws types
+            if (type === 'ws' && params.get('path')) {
+                stripped += `&path=${encodeURIComponent(params.get('path'))}`;
+            }
+            
+            // Add host header if present
+            if (params.get('host')) {
+                stripped += `&host=${encodeURIComponent(params.get('host'))}`;
+            }
+            
+            // Add sni if present
+            if (params.get('sni')) {
+                stripped += `&sni=${encodeURIComponent(params.get('sni'))}`;
+            }
+            
+            // Add flow if present (for xtls-rprx-vision, etc)
+            if (params.get('flow')) {
+                stripped += `&flow=${params.get('flow')}`;
+            }
+            
+            return stripped;
+            
+        } catch (error) {
+            throw new Error('Invalid VLESS URL format');
+        }
+    }
 
-  testBtn.disabled = false;
-  testBtn.textContent = 'Test + Build';
+    parseRawConfig(config) {
+        // If it's already a simple format, just clean it up
+        if (config.includes('vless://')) {
+            return config.replace(/["']/g, '').trim();
+        }
+        
+        // Try to extract UUID, server, port from various formats
+        const uuidMatch = config.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
+        const serverMatch = config.match(/(?:server|host|address)[=:]\s*([^\s,]+)/i);
+        const portMatch = config.match(/(?:port)[=:]\s*(\d+)/i);
+        
+        if (uuidMatch && serverMatch && portMatch) {
+            return `vless://${uuidMatch[0]}@${serverMatch[1]}:${portMatch[1]}?type=tcp&security=none`;
+        }
+        
+        throw new Error('Could not parse configuration format');
+    }
+
+    async copyToClipboard() {
+        const text = this.strippedConfig.textContent;
+        
+        try {
+            await navigator.clipboard.writeText(text);
+            this.copyBtn.textContent = 'Copied!';
+            this.copyBtn.classList.add('copied');
+            this.showMessage('Configuration copied to clipboard!', 'success');
+            
+            setTimeout(() => {
+                this.copyBtn.textContent = 'Copy';
+                this.copyBtn.classList.remove('copied');
+            }, 2000);
+        } catch (error) {
+            this.showMessage('Failed to copy to clipboard', 'error');
+            console.error('Copy error:', error);
+        }
+    }
+
+    showOutput() {
+        this.outputSection.style.display = 'block';
+    }
+
+    hideOutput() {
+        this.outputSection.style.display = 'none';
+    }
+
+    showMessage(text, type) {
+        this.message.textContent = text;
+        this.message.className = type;
+        this.message.style.display = 'block';
+        
+        setTimeout(() => {
+            this.message.style.display = 'none';
+        }, 3000);
+    }
 }
 
-// COPY
-function copyConfig() {
-  navigator.clipboard.writeText(currentVlessLink).then(() => {
-    alert('Copied!');
-  }).catch(() => {
-    prompt('Copy:', currentVlessLink);
-  });
-}
-
-// OPEN NEKOBOX
-function testVlessLink() {
-  const nekobox = `nekobox://import?url=${encodeURIComponent(currentVlessLink)}`;
-  window.open(nekobox, '_blank');
-  log(`Opening in Nekobox...`);
-}
+// Initialize the application when DOM is loaded
+document.addEventListener('DOMContentLoaded', () => {
+    new VlessStripper();
+});
