@@ -1,6 +1,10 @@
-// scan.js – Single SNI Test with Real IP
+// scan.js – VLESS Builder + SNI Test + Copy + Open
 const output = document.getElementById('output');
 const testBtn = document.getElementById('testBtn');
+const resultSection = document.getElementById('resultSection');
+const vlessConfig = document.getElementById('vlessConfig');
+
+let currentVlessLink = '';
 
 async function log(msg) {
   output.innerHTML += msg + '\n';
@@ -9,6 +13,7 @@ async function log(msg) {
 
 function clearOutput() {
   output.innerHTML = '';
+  resultSection.style.display = 'none';
 }
 
 async function getRealIP(domain) {
@@ -21,62 +26,79 @@ async function getRealIP(domain) {
   }
 }
 
-async function testSingleSNI() {
+async function testSNI(domain, sni, hostHeader) {
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000);
+    const start = performance.now();
+
+    await fetch(`https://${domain}`, {
+      headers: { 'Host': sni },
+      signal: controller.signal,
+      mode: 'no-cors'
+    });
+
+    clearTimeout(timeout);
+    const time = ((performance.now() - start) / 1000).toFixed(2);
+    return { success: true, time, ip: await getRealIP(domain) };
+  } catch (e) {
+    return { success: false, time: 'N/A', ip: await getRealIP(domain) };
+  }
+}
+
+async function runFullTest() {
   clearOutput();
+  resultSection.style.display = 'none';
+
   const domain = document.getElementById('domain').value.trim();
   const sni = document.getElementById('sni').value.trim();
   const hostHeader = document.getElementById('hostHeader').value.trim() || domain;
+  const uuid = document.getElementById('uuid').value.trim();
+  const port = document.getElementById('port').value.trim() || '443';
 
-  if (!domain || !sni) {
-    log('<span class="fail">Error: Domain and SNI required</span>');
+  if (!domain || !sni || !uuid) {
+    log('<span class="fail">Error: Domain, SNI, and UUID required</span>');
     return;
   }
 
   testBtn.disabled = true;
-  testBtn.textContent = 'Testing...';
+  testBtn.textContent = 'Testing SNI...';
   log(`Testing: ${domain} → SNI: ${sni} | Host: ${hostHeader}\n`);
 
-  const startTime = performance.now();
-  let success = false;
+  const result = await testSNI(domain, sni, hostHeader);
 
-  try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 8000);
+  log(`Result: <span class="${result.success ? 'success' : 'fail'}">${result.success ? '200 OK' : 'BLOCKED'}</span>`);
+  log(`Time: ${result.time}s`);
+  log(`Real IP: ${result.ip}\n`);
 
-    const res = await fetch(`https://${domain}`, {
-      method: 'GET',
-      headers: { 'Host': sni },
-      signal: controller.signal,
-      mode: 'no-cors' // Required for SNI to take effect
-    });
+  const vless = `vless://${uuid}@${domain}:${port}?type=ws&security=tls&sni=${sni}&host=${hostHeader}#MY-ZT`;
+  currentVlessLink = vless;
 
-    clearTimeout(timeout);
-    success = true; // Connection succeeded = SNI likely accepted
-  } catch (e) {
-    success = false;
-  }
+  vlessConfig.textContent = vless;
+  resultSection.style.display = 'block';
 
-  const elapsed = ((performance.now() - startTime) / 1000).toFixed(2);
-  const ip = await getRealIP(domain);
-
-  log(`Result: <span class="${success ? 'success' : 'fail'}">${success ? '200 OK' : 'BLOCKED'}</span>`);
-  log(`Time: ${elapsed}s`);
-  log(`Real IP: ${ip}`);
-  log(`SNI Used: ${sni}`);
-  log(`Host Header: ${hostHeader}`);
-
-  if (success) {
-    const config = `vless://uuid@${domain}:443?type=ws&security=tls&sni=${sni}&host=${hostHeader}#MY-ZT`;
-    log(`\nCONFIG:\n<span class="success">${config}</span>`);
+  if (result.success) {
+    log(`<span class="success">VLESS Config Ready!</span>`);
   } else {
-    log(`\n<span class="fail">SNI blocked or domain down</span>`);
+    log(`<span class="fail">SNI blocked. Try another SNI.</span>`);
   }
 
   testBtn.disabled = false;
-  testBtn.textContent = 'Test SNI Now';
+  testBtn.textContent = 'Test SNI + Build';
 }
 
-// Run on button click
-function runTest() {
-  testSingleSNI();
+// COPY TO CLIPBOARD
+function copyConfig() {
+  navigator.clipboard.writeText(currentVlessLink).then(() => {
+    alert('Copied to clipboard!');
+  }).catch(() => {
+    prompt('Copy manually:', currentVlessLink);
+  });
+}
+
+// OPEN IN NEKOBOX / v2RAYNG
+function testVlessLink() {
+  const nekobox = `nekobox://import?url=${encodeURIComponent(currentVlessLink)}`;
+  window.open(nekobox, '_blank');
+  log(`Opening in Nekobox...`);
 }
