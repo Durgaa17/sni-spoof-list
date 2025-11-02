@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>API Test</title>
+</head>
+<body>
+    <h1>Check-Host.net API Test</h1>
+    <button onclick="testAPI()">Test API</button>
+    <div id="results"></div>
+
+    <script>
+        async function testAPI() {
+            const results = document.getElementById('results');
+            results.innerHTML = '<p>Testing API endpoints...</p>';
+            
+            const tests = [
+                { name: 'Ping Test', endpoint: '/check-ping', host: 'google.com' },
+                { name: 'TCP Test', endpoint: '/check-tcp', host: 'google.com:80' },
+                { name: 'HTTP Test', endpoint: '/check-http', host: 'https://google.com' }
+            ];
+            
+            for (const test of tests) {
+                try {
+                    const response = await fetch('https://check-host.net' + test.endpoint, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/x-www-form-urlencoded',
+                        },
+                        body: new URLSearchParams({ host: test.host })
+                    });
+                    
+                    if (response.ok) {
+                        const data = await response.json();
+                        results.innerHTML += `<p style="color: green;">✅ ${test.name}: WORKING (Request ID: ${data.request_id})</p>`;
+                    } else {
+                        results.innerHTML += `<p style="color: red;">❌ ${test.name}: FAILED (Status: ${response.status})</p>`;
+                    }
+                } catch (error) {
+                    results.innerHTML += `<p style="color: red;">❌ ${test.name}: ERROR (${error.message})</p>`;
+                }
+            }
+        }
+    </script>
+</body>
+</html>
