@@ -3,25 +3,43 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>SNI Checker v1.0</title>
+  <title>SNI Single Tester</title>
   <style>
-    :root { --bg: #0d1117; --card: #161b22; --text: #58a6ff; --green: #238636; --red: #da3633; }
+    :root { --bg: #0d1117; --card: #161b22; --text: #58a6ff; --green: #238636; --red: #da3633; --gray: #8b949e; }
     body { background: var(--bg); color: var(--text); font-family: 'Courier New', monospace; padding: 20px; }
-    .container { max-width: 800px; margin: 0 auto; }
-    h1 { color: white; margin-bottom: 10px; }
-    button { background: var(--green); color: white; border: none; padding: 12px 20px; border-radius: 6px; cursor: pointer; font-weight: bold; }
+    .container { max-width: 700px; margin: 0 auto; }
+    h1 { color: white; margin-bottom: 10px; font-size: 1.6rem; }
+    .form { background: var(--card); padding: 18px; border-radius: 8px; border: 1px solid #30363d; margin-bottom: 20px; }
+    label { display: block; margin: 12px 0 6px; font-size: 0.9rem; color: var(--gray); }
+    input { width: 100%; padding: 10px; background: #0d1117; border: 1px solid #30363d; border-radius: 6px; color: white; font-family: inherit; }
+    button { background: var(--green); color: white; border: none; padding: 12px 20px; border-radius: 6px; cursor: pointer; font-weight: bold; margin-top: 15px; width: 100%; }
     button:hover { background: #2ea043; }
-    #output { background: var(--card); border: 1px solid #30363d; padding: 16px; margin-top: 20px; border-radius: 8px; min-height: 300px; white-space: pre-wrap; font-size: 0.9rem; overflow-y: auto; }
+    button:disabled { background: #30363d; cursor: not-allowed; }
+    #output { background: var(--card); border: 1px solid #30363d; padding: 16px; border-radius: 8px; min-height: 180px; white-space: pre-wrap; font-size: 0.9rem; overflow-y: auto; }
     .success { color: #7ce38b; }
     .fail { color: var(--red); }
+    .loading { color: #f0b90b; }
   </style>
 </head>
 <body>
   <div class="container">
-    <h1>SNI Spoof Checker</h1>
-    <p><small>domains.txt → targets | sni-list.txt → SNI list</small></p>
-    <button onclick="runCheck()">Run SNI Check</button>
-    <pre id="output">Ready. Click button to start.</pre>
+    <h1>SNI Single Tester</h1>
+    <p><small>Test one domain + SNI → Get 200 OK + Real IP</small></p>
+
+    <div class="form">
+      <label>Target Domain (e.g., unifi.com.my)</label>
+      <input type="text" id="domain" placeholder="unifi.com.my" value="unifi.com.my" />
+
+      <label>SNI (Spoof, e.g., www.speedtest.net)</label>
+      <input type="text" id="sni" placeholder="www.speedtest.net" value="www.speedtest.net" />
+
+      <label>Host Header (optional, default = domain)</label>
+      <input type="text" id="hostHeader" placeholder="Leave empty to use domain" />
+
+      <button onclick="runTest()" id="testBtn">Test SNI Now</button>
+    </div>
+
+    <pre id="output">Enter values and click "Test SNI Now"</pre>
   </div>
 
   <script src="scan.js"></script>
