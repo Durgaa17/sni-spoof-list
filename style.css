@@ -179,6 +179,47 @@ footer {
     background: #5a6268;
 }
 
+/* Viewer Styles */
+.content-list {
+    max-height: 500px;
+    overflow-y: auto;
+    border: 1px solid #333;
+    border-radius: 5px;
+    background: #1a1a1a;
+}
+
+.list-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 15px;
+    border-bottom: 1px solid #333;
+    transition: background 0.2s;
+}
+
+.list-item:hover {
+    background: #2a2a2a;
+}
+
+.list-item:last-child {
+    border-bottom: none;
+}
+
+.domain-text, .sni-text {
+    font-family: monospace;
+    word-break: break-all;
+}
+
+.viewer-controls {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 15px;
+}
+
+.viewer-controls input {
+    flex: 1;
+}
+
 /* Mobile Responsive */
 @media (max-width: 768px) {
     .container {
