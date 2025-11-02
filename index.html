@@ -34,13 +34,20 @@
             font-size: clamp(1.5rem, 4vw, 2rem);
         }
 
+        .config-types {
+            text-align: center;
+            margin-bottom: 20px;
+            color: #666;
+            font-size: 0.9rem;
+        }
+
         .input-section {
             margin-bottom: 25px;
         }
 
         .input-header {
             display: flex;
-            justify-content: between;
+            justify-content: space-between;
             align-items: center;
             margin-bottom: 10px;
             gap: 10px;
@@ -254,6 +261,9 @@
 <body>
     <div class="container">
         <h1>VLESS Config Stripper</h1>
+        <div class="config-types">
+            Optimized for: VLESS+WS+TLS • VLESS+WS • VLESS+TCP
+        </div>
         
         <div class="input-section">
             <div class="input-header">
@@ -269,7 +279,11 @@
             </div>
             <textarea 
                 id="configInput" 
-                placeholder="Paste your VLESS configuration here or click the Paste button above..."
+                placeholder="Paste your VLESS configuration here or click the Paste button above...
+                
+Examples:
+vless://uuid@server.com:443?type=ws&path=/path&security=tls&sni=domain.com
+vless://uuid@server.com:80?type=ws&path=/path"
             ></textarea>
         </div>
 
