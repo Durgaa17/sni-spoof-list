@@ -10,8 +10,8 @@ export default function initDomainsViewer(container) {
             </p>
             
             <div class="viewer-controls">
-                <input type="text" id="searchDomains" placeholder="Search domains..." style="width: 100%; padding: 10px; margin-bottom: 15px;">
-                <button id="copyAllDomains" class="stripper-btn">📋 Copy All</button>
+                <input type="text" id="searchDomains" placeholder="Search domains...">
+                <button id="copyAllDomains" class="copy-all-btn">📋 Copy All</button>
             </div>
             
             <div id="domainsList" class="content-list">
@@ -88,7 +88,7 @@ function displayDomains(domains) {
         
         items.forEach(item => {
             const domain = item.querySelector('.domain-text').textContent.toLowerCase();
-            item.style.display = domain.includes(searchTerm) ? 'block' : 'none';
+            item.style.display = domain.includes(searchTerm) ? 'flex' : 'none';
         });
     });
     
