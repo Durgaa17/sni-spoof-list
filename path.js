@@ -2,12 +2,15 @@
 export const MODULE_PATHS = {
     TOOLS: {
         VLESS_STRIPPER: 'tools/stripper.js',
-        // Add more tools here as you create them
-        STRIPPER_ANALYSIS: 'tools/stripper-analysis.js',  // NEW
-        STRIPPER_CORE: 'tools/stripper-core.js',      // NEW
-        STRIPPER_UI: 'tools/stripper-ui.js',          // NEW
+        STRIPPER_ANALYSIS: 'tools/stripper-analysis.js',
+        STRIPPER_CORE: 'tools/stripper-core.js',
+        STRIPPER_UI: 'tools/stripper-ui.js',
         CONFIG_VALIDATOR: 'tools/validator.js',
-        SNI_CHECKER: 'tools/sni-checker.js'
+        VALIDATOR_CORE: 'tools/validator-core.js',
+        VALIDATOR_UI: 'tools/validator-ui.js'
+    },
+    SHARED: {
+        VALIDATION_RULES: 'shared/validation-rules.js'
     },
     ASSETS: {
         IMAGES: 'assets/images/',
@@ -18,13 +21,3 @@ export const MODULE_PATHS = {
         HELP: 'pages/help.js'
     }
 };
-
-// Example of how to add new paths easily:
-/*
-export const MODULE_PATHS = {
-    TOOLS: {
-        VLESS_STRIPPER: 'tools/stripper.js',
-        NEW_TOOL: 'tools/new-tool.js'  // Just add here!
-    }
-};
-*/
