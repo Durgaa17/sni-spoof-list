@@ -1,0 +1,66 @@
+name: Generate Detailed Folder Structure
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  generate-structure:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Install tree
+      run: sudo apt-get update && sudo apt-get install -y tree
+    
+    - name: Generate detailed structure
+      run: |
+        # Create a comprehensive structure file
+        echo "# 🗂️ REPOSITORY STRUCTURE" > REPOSITORY_STRUCTURE.md
+        echo "**Generated:** $(date)" >> REPOSITORY_STRUCTURE.md
+        echo "**Branch:** ${{ github.ref }}" >> REPOSITORY_STRUCTURE.md
+        echo "" >> REPOSITORY_STRUCTURE.md
+        
+        echo "## 📊 File Statistics" >> REPOSITORY_STRUCTURE.md
+        echo "\`\`\`" >> REPOSITORY_STRUCTURE.md
+        find . -type f -not -path './.git/*' -not -path './node_modules/*' | wc -l | xargs echo "Total files:" >> REPOSITORY_STRUCTURE.md
+        find . -type d -not -path './.git/*' -not -path './node_modules/*' | wc -l | xargs echo "Total folders:" >> REPOSITORY_STRUCTURE.md
+        echo "\`\`\`" >> REPOSITORY_STRUCTURE.md
+        echo "" >> REPOSITORY_STRUCTURE.md
+        
+        echo "## 🌳 Folder Tree" >> REPOSITORY_STRUCTURE.md
+        echo "\`\`\`" >> REPOSITORY_STRUCTURE.md
+        tree -a -I '.git|node_modules' --dirsfirst -L 5 >> REPOSITORY_STRUCTURE.md
+        echo "\`\`\`" >> REPOSITORY_STRUCTURE.md
+        echo "" >> REPOSITORY_STRUCTURE.md
+        
+        echo "## 📄 Key Files" >> REPOSITORY_STRUCTURE.md
+        echo "\`\`\`" >> REPOSITORY_STRUCTURE.md
+        ls -la *.html *.css *.js *.json *.md 2>/dev/null || echo "No key files found" >> REPOSITORY_STRUCTURE.md
+        echo "\`\`\`" >> REPOSITORY_STRUCTURE.md
+        
+        # Create a simple copy-paste version
+        echo "📁 Repository Structure - Copy Paste Version:" > structure-copy-paste.txt
+        echo "==============================================" >> structure-copy-paste.txt
+        tree -a -I '.git|node_modules' --dirsfirst -L 3 >> structure-copy-paste.txt
+        
+        echo "✅ Detailed structure generated"
+        
+    - name: Upload structure files
+      uses: actions/upload-artifact@v4
+      with:
+        name: repository-structure
+        path: |
+          REPOSITORY_STRUCTURE.md
+          structure-copy-paste.txt
+        retention-days: 30
+        
+    - name: Create Structure Summary
+      run: |
+        echo "## Structure Generation Complete" >> $GITHUB_STEP_SUMMARY
+        echo "📁 Repository structure files have been generated and uploaded as artifacts." >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "**Download the artifacts to get:**" >> $GITHUB_STEP_SUMMARY
+        echo "- 📄 REPOSITORY_STRUCTURE.md (Detailed markdown)" >> $GITHUB_STEP_SUMMARY
+        echo "- 📋 structure-copy-paste.txt (Simple text version)" >> $GITHUB_STEP_SUMMARY
