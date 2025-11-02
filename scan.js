@@ -2,6 +2,7 @@ class VlessStripper {
     constructor() {
         this.configInput = document.getElementById('configInput');
         this.stripBtn = document.getElementById('stripBtn');
+        this.pasteBtn = document.getElementById('pasteBtn');
         this.outputSection = document.getElementById('outputSection');
         this.strippedConfig = document.getElementById('strippedConfig');
         this.copyBtn = document.getElementById('copyBtn');
@@ -12,14 +13,48 @@ class VlessStripper {
 
     initEventListeners() {
         this.stripBtn.addEventListener('click', () => this.stripConfig());
+        this.pasteBtn.addEventListener('click', () => this.handlePaste());
         this.copyBtn.addEventListener('click', () => this.copyToClipboard());
         
-        // Auto-strip when paste happens
+        // Auto-strip when manual paste happens in textarea
         this.configInput.addEventListener('paste', (e) => {
             setTimeout(() => {
                 this.stripConfig();
             }, 100);
         });
+
+        // Handle Enter key in textarea
+        this.configInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                this.stripConfig();
+            }
+        });
+    }
+
+    async handlePaste() {
+        try {
+            // Show loading state
+            this.setButtonLoading(this.pasteBtn, true);
+            
+            const text = await navigator.clipboard.readText();
+            this.configInput.value = text;
+            this.showMessage('Content pasted successfully!', 'success');
+            
+            // Auto-strip after paste
+            setTimeout(() => {
+                this.stripConfig();
+            }, 500);
+            
+        } catch (error) {
+            this.showMessage('Please allow clipboard permissions or paste manually', 'error');
+            console.error('Paste error:', error);
+            
+            // Fallback: focus on textarea for manual paste
+            this.configInput.focus();
+            this.showMessage('Please paste manually in the text area', 'error');
+        } finally {
+            this.setButtonLoading(this.pasteBtn, false);
+        }
     }
 
     stripConfig() {
@@ -31,16 +66,23 @@ class VlessStripper {
             return;
         }
 
-        try {
-            const stripped = this.processVlessConfig(input);
-            this.strippedConfig.textContent = stripped;
-            this.showOutput();
-            this.showMessage('Configuration stripped successfully!', 'success');
-        } catch (error) {
-            this.showMessage('Error: Invalid VLESS configuration format', 'error');
-            this.hideOutput();
-            console.error('Stripping error:', error);
-        }
+        // Show loading state
+        this.setButtonLoading(this.stripBtn, true);
+
+        setTimeout(() => {
+            try {
+                const stripped = this.processVlessConfig(input);
+                this.strippedConfig.textContent = stripped;
+                this.showOutput();
+                this.showMessage('Configuration stripped successfully!', 'success');
+            } catch (error) {
+                this.showMessage('Error: Invalid VLESS configuration format', 'error');
+                this.hideOutput();
+                console.error('Stripping error:', error);
+            } finally {
+                this.setButtonLoading(this.stripBtn, false);
+            }
+        }, 500);
     }
 
     processVlessConfig(config) {
@@ -64,7 +106,7 @@ class VlessStripper {
             const uuid = parsed.username;
             const server = parsed.hostname;
             const port = parsed.port;
-            const params = new URLSearchParams(parsed.hash.substring(1)); // Remove # from hash
+            const params = new URLSearchParams(parsed.hash.substring(1));
             
             // Get type (default to tcp if not specified)
             const type = params.get('type') || 'tcp';
@@ -76,25 +118,13 @@ class VlessStripper {
             let stripped = `vless://${uuid}@${server}:${port}`;
             stripped += `?type=${type}&security=${security}`;
             
-            // Add path for ws types
-            if (type === 'ws' && params.get('path')) {
-                stripped += `&path=${encodeURIComponent(params.get('path'))}`;
-            }
-            
-            // Add host header if present
-            if (params.get('host')) {
-                stripped += `&host=${encodeURIComponent(params.get('host'))}`;
-            }
-            
-            // Add sni if present
-            if (params.get('sni')) {
-                stripped += `&sni=${encodeURIComponent(params.get('sni'))}`;
-            }
-            
-            // Add flow if present (for xtls-rprx-vision, etc)
-            if (params.get('flow')) {
-                stripped += `&flow=${params.get('flow')}`;
-            }
+            // Add essential parameters only
+            const essentialParams = ['path', 'host', 'sni', 'flow', 'encryption'];
+            essentialParams.forEach(param => {
+                if (params.get(param)) {
+                    stripped += `&${param}=${encodeURIComponent(params.get(param))}`;
+                }
+            });
             
             return stripped;
             
@@ -124,24 +154,63 @@ class VlessStripper {
     async copyToClipboard() {
         const text = this.strippedConfig.textContent;
         
+        if (!text) {
+            this.showMessage('No configuration to copy', 'error');
+            return;
+        }
+
         try {
             await navigator.clipboard.writeText(text);
-            this.copyBtn.textContent = 'Copied!';
+            this.copyBtn.textContent = '✅ Copied!';
             this.copyBtn.classList.add('copied');
             this.showMessage('Configuration copied to clipboard!', 'success');
             
             setTimeout(() => {
-                this.copyBtn.textContent = 'Copy';
+                this.copyBtn.textContent = '📋 Copy Stripped Config';
                 this.copyBtn.classList.remove('copied');
             }, 2000);
         } catch (error) {
             this.showMessage('Failed to copy to clipboard', 'error');
-            console.error('Copy error:', error);
+            
+            // Fallback method
+            this.fallbackCopyToClipboard(text);
+        }
+    }
+
+    fallbackCopyToClipboard(text) {
+        const textArea = document.createElement('textarea');
+        textArea.value = text;
+        document.body.appendChild(textArea);
+        textArea.select();
+        try {
+            document.execCommand('copy');
+            this.showMessage('Configuration copied to clipboard!', 'success');
+        } catch (err) {
+            this.showMessage('Failed to copy to clipboard', 'error');
+        }
+        document.body.removeChild(textArea);
+    }
+
+    setButtonLoading(button, isLoading) {
+        if (isLoading) {
+            button.classList.add('loading');
+            button.innerHTML = '<span class="spinner"></span>Processing...';
+            button.disabled = true;
+        } else {
+            button.classList.remove('loading');
+            button.disabled = false;
+            if (button === this.pasteBtn) {
+                button.textContent = '📋 Paste';
+            } else if (button === this.stripBtn) {
+                button.textContent = '⚡ Strip';
+            }
         }
     }
 
     showOutput() {
         this.outputSection.style.display = 'block';
+        // Smooth scroll to output
+        this.outputSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
 
     hideOutput() {
@@ -155,7 +224,7 @@ class VlessStripper {
         
         setTimeout(() => {
             this.message.style.display = 'none';
-        }, 3000);
+        }, 4000);
     }
 }
 
