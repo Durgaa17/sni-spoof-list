@@ -1,6 +1,6 @@
-// shared/connection-tester.js - Enhanced with smart testing
+// shared/connection-tester.js - Enhanced with protocol awareness
 import { testHostReachability } from './ping-tester.js';
-import { testPortConnectivity } from './port-tester.js';
+import { testPortConnectivity, testWebSocketConnectivity } from './port-tester.js';
 import { quickConnectionTest } from './external/check-host-api.js';
 
 export async function testConnection(configAnalysis, useExternalAPI = true) {
@@ -8,9 +8,11 @@ export async function testConnection(configAnalysis, useExternalAPI = true) {
         method: 'fallback',
         hostReachability: null,
         portConnectivity: null,
+        websocketConnectivity: null,
         externalResults: null,
         overall: 'unknown',
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        configType: getConfigType(configAnalysis)
     };
 
     try {
@@ -24,7 +26,6 @@ export async function testConnection(configAnalysis, useExternalAPI = true) {
                     configAnalysis.port
                 );
                 
-                // If external API returns fallback flag, switch to basic
                 if (results.externalResults.ping?.fallback) {
                     throw new Error('External API unavailable, using fallback');
                 }
@@ -34,26 +35,37 @@ export async function testConnection(configAnalysis, useExternalAPI = true) {
             } catch (externalError) {
                 console.log('External API failed, switching to fallback:', externalError);
                 results.method = 'fallback';
-                // Continue to fallback method
             }
         }
 
         // Use fallback methods if external API not used or failed
         if (results.method === 'fallback') {
-            console.log('Using fallback connection testing...');
+            console.log('Using protocol-aware fallback testing...');
             
             // Test host reachability
             results.hostReachability = await testHostReachability(configAnalysis.server);
             
             // Only test port if host is reachable
             if (results.hostReachability.reachable) {
+                // Test regular port connectivity
                 results.portConnectivity = await testPortConnectivity(
                     configAnalysis.server, 
-                    configAnalysis.port
+                    configAnalysis.port,
+                    configAnalysis.security
                 );
+                
+                // Additional WebSocket test for WS configurations
+                if (configAnalysis.type === 'ws') {
+                    results.websocketConnectivity = await testWebSocketConnectivity(
+                        configAnalysis.server,
+                        configAnalysis.port,
+                        configAnalysis.security,
+                        configAnalysis.path || '/'
+                    );
+                }
             }
             
-            results.overall = determineOverallStatusFromFallback(results);
+            results.overall = determineOverallStatusFromFallback(results, configAnalysis);
         }
 
     } catch (error) {
@@ -65,12 +77,18 @@ export async function testConnection(configAnalysis, useExternalAPI = true) {
     return results;
 }
 
+function getConfigType(analysis) {
+    if (analysis.type === 'ws') {
+        return analysis.security === 'tls' ? 'websocket_tls' : 'websocket_plain';
+    }
+    return analysis.security === 'tls' ? 'tcp_tls' : 'tcp_plain';
+}
+
 function determineOverallStatusFromExternal(externalResults) {
     if (!externalResults) return 'error';
     
     const { ping, tcp, http } = externalResults;
     
-    // If we have ping and TCP results
     if (ping?.success && tcp?.success) {
         return 'healthy';
     } else if (!ping?.success) {
@@ -80,16 +98,28 @@ function determineOverallStatusFromExternal(externalResults) {
     }
 }
 
-function determineOverallStatusFromFallback(results) {
+function determineOverallStatusFromFallback(results, configAnalysis) {
     if (!results.hostReachability?.reachable) {
         return 'host_unreachable';
-    } else if (!results.portConnectivity?.reachable) {
-        return 'port_unreachable';
-    } else if (results.hostReachability.reachable && results.portConnectivity.reachable) {
-        return 'healthy';
-    } else {
-        return 'unknown';
     }
+    
+    // For WebSocket configs, check WebSocket connectivity specifically
+    if (configAnalysis.type === 'ws' && results.websocketConnectivity) {
+        if (!results.websocketConnectivity.reachable) {
+            return 'websocket_unreachable';
+        }
+    }
+    
+    // For regular TCP/HTTP configs, check port connectivity
+    if (!results.portConnectivity?.reachable) {
+        return 'port_unreachable';
+    }
+    
+    if (results.hostReachability.reachable && results.portConnectivity.reachable) {
+        return 'healthy';
+    }
+    
+    return 'unknown';
 }
 
 export function generateConnectionReport(connectionResults) {
@@ -152,14 +182,21 @@ function generateExternalAPIReport(externalResults) {
 function generateFallbackReport(connectionResults) {
     const host = connectionResults.hostReachability;
     const port = connectionResults.portConnectivity;
+    const websocket = connectionResults.websocketConnectivity;
 
     let summary, details, status;
 
     switch (connectionResults.overall) {
         case 'healthy':
             status = 'success';
-            summary = `✅ Connection Healthy (${port.latency}ms)`;
-            details = `Host reachable (${host.latency}ms), Port responsive (${port.latency}ms)`;
+            if (websocket?.reachable) {
+                summary = `✅ WebSocket Healthy (${websocket.latency}ms)`;
+                details = `Host reachable (${host.latency}ms), WebSocket responsive (${websocket.latency}ms)`;
+            } else {
+                summary = `✅ Connection Healthy (${port.latency}ms)`;
+                details = `Host reachable (${host.latency}ms), ${port.protocol?.toUpperCase()} responsive (${port.latency}ms)`;
+                if (port.note) details += ` - ${port.note}`;
+            }
             break;
         
         case 'host_unreachable':
@@ -171,7 +208,13 @@ function generateFallbackReport(connectionResults) {
         case 'port_unreachable':
             status = 'warning';
             summary = '⚠️ Port Not Reachable';
-            details = `Host OK (${host.latency}ms) but port ${port.error}`;
+            details = `Host OK (${host.latency}ms) but ${port.protocol?.toUpperCase()} port ${port.error}`;
+            break;
+            
+        case 'websocket_unreachable':
+            status = 'warning';
+            summary = '⚠️ WebSocket Not Reachable';
+            details = `Host OK (${host.latency}ms) but WebSocket failed: ${websocket.error}`;
             break;
         
         default:
@@ -184,8 +227,9 @@ function generateFallbackReport(connectionResults) {
         summary,
         details,
         status,
-        latency: port?.latency || host?.latency,
+        latency: websocket?.latency || port?.latency || host?.latency,
         timestamp: connectionResults.timestamp,
-        method: 'basic_test'
+        method: 'protocol_aware_test',
+        configType: connectionResults.configType
     };
 }
