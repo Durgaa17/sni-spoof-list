@@ -8,22 +8,9 @@ class HomePage {
                 title: 'VLESS Stripper',
                 icon: '⚡',
                 description: 'Strip VLESS configurations to basic parameters',
-                module: 'stripper.js'
-            },
-            {
-                id: 'config-validator',
-                title: 'Config Validator',
-                icon: '✅',
-                description: 'Validate and test your configurations',
-                module: 'validator.js'
-            },
-            {
-                id: 'sni-checker',
-                title: 'SNI Checker',
-                icon: '🌐',
-                description: 'Check SNI and domain configurations',
-                module: 'sni-checker.js'
+                module: './tools/stripper.js'
             }
+            // Add more tools here later...
         ];
         
         this.init();
@@ -36,12 +23,20 @@ class HomePage {
 
     loadToolsGrid() {
         this.toolsGrid.innerHTML = this.tools.map(tool => `
-            <div class="tool-card" onclick="homePage.loadTool('${tool.id}')">
+            <div class="tool-card" data-tool="${tool.id}">
                 <div class="tool-icon">${tool.icon}</div>
                 <div class="tool-title">${tool.title}</div>
                 <div class="tool-desc">${tool.description}</div>
             </div>
         `).join('');
+
+        // Add event listeners to tool cards
+        this.toolsGrid.querySelectorAll('.tool-card').forEach(card => {
+            card.addEventListener('click', (e) => {
+                const toolId = e.currentTarget.getAttribute('data-tool');
+                this.loadTool(toolId);
+            });
+        });
     }
 
     showWelcome() {
@@ -70,9 +65,9 @@ class HomePage {
             `;
 
             // Load the tool module
-            const module = await import(`./${tool.module}`);
+            const module = await import(tool.module);
             
-            // Clear content and let the module render its UI
+            // Clear content
             this.contentArea.innerHTML = '';
             
             // Add back button
@@ -85,6 +80,8 @@ class HomePage {
             // Initialize the tool
             if (module.default) {
                 module.default(this.contentArea);
+            } else {
+                throw new Error('Tool module format is invalid');
             }
 
         } catch (error) {
@@ -93,6 +90,9 @@ class HomePage {
                 <div style="text-align: center; padding: 40px 0; color: #ff6b6b;">
                     <h3>Failed to load tool</h3>
                     <p>${error.message}</p>
+                    <p style="font-size: 0.9rem; color: #888; margin-top: 10px;">
+                        File: ${tool.module}
+                    </p>
                     <button class="back-btn" onclick="homePage.showHome()">Back to Home</button>
                 </div>
             `;
