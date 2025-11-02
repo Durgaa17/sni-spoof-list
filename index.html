@@ -46,23 +46,13 @@
         }
 
         .input-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
             margin-bottom: 10px;
-            gap: 10px;
         }
 
         .input-header h3 {
             color: #333;
-            flex-grow: 1;
             font-size: clamp(1rem, 3vw, 1.2rem);
-        }
-
-        .button-group {
-            display: flex;
-            gap: 10px;
-            flex-wrap: wrap;
+            text-align: center;
         }
 
         textarea {
@@ -91,8 +81,8 @@
             cursor: pointer;
             font-size: clamp(0.9rem, 2.5vw, 1rem);
             transition: all 0.3s;
-            flex: 1;
-            min-width: 120px;
+            width: 100%;
+            margin-top: 10px;
         }
 
         button:hover {
@@ -146,18 +136,6 @@
             background: #17a2b8;
         }
 
-        .paste-btn {
-            background: #ff6b35;
-        }
-
-        .paste-btn:hover {
-            background: #e55a2b;
-        }
-
-        .strip-btn {
-            background: #667eea;
-        }
-
         .error {
             color: #dc3545;
             background: #f8d7da;
@@ -195,24 +173,8 @@
                 font-size: 13px;
             }
 
-            .button-group {
-                flex-direction: column;
-            }
-
             button {
-                width: 100%;
-                min-width: auto;
                 padding: 14px;
-            }
-
-            .input-header {
-                flex-direction: column;
-                align-items: stretch;
-            }
-
-            .input-header h3 {
-                text-align: center;
-                margin-bottom: 10px;
             }
         }
 
@@ -268,23 +230,18 @@
         <div class="input-section">
             <div class="input-header">
                 <h3>Paste VLESS Configuration:</h3>
-                <div class="button-group">
-                    <button class="paste-btn" id="pasteBtn">
-                        📋 Paste
-                    </button>
-                    <button class="strip-btn" id="stripBtn">
-                        ⚡ Strip
-                    </button>
-                </div>
             </div>
             <textarea 
                 id="configInput" 
-                placeholder="Paste your VLESS configuration here or click the Paste button above...
+                placeholder="Paste your VLESS configuration here...
                 
 Examples:
-vless://uuid@server.com:443?type=ws&path=/path&security=tls&sni=domain.com
-vless://uuid@server.com:80?type=ws&path=/path"
+vless://uuid@server.com:443?encryption=none&security=tls&sni=domain.com&type=ws&host=domain.com&path=%2Fpath
+vless://uuid@server.com:80?encryption=none&security=none&type=ws&host=server.com&path=%2Fpath"
             ></textarea>
+            <button class="strip-btn" id="stripBtn">
+                ⚡ Strip Configuration
+            </button>
         </div>
 
         <div id="message"></div>
