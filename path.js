@@ -1,11 +1,13 @@
-// path.js - Complete module paths
+// path.js - Add new viewers
 export const MODULE_PATHS = {
     TOOLS: {
         VLESS_STRIPPER: 'tools/stripper.js',
+        CONFIG_VALIDATOR: 'tools/validator.js',
+        DOMAINS_VIEWER: 'tools/domains-viewer.js',    // NEW
+        SNI_VIEWER: 'tools/sni-viewer.js',            // NEW
         STRIPPER_ANALYSIS: 'tools/stripper-analysis.js',
         STRIPPER_CORE: 'tools/stripper-core.js',
         STRIPPER_UI: 'tools/stripper-ui.js',
-        CONFIG_VALIDATOR: 'tools/validator.js',
         VALIDATOR_CORE: 'tools/validator-core.js',
         VALIDATOR_UI: 'tools/validator-ui.js'
     },
