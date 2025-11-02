@@ -1,5 +1,5 @@
-// tools/validator-core.js - Phase 2: Enhanced with Connection Testing
-import { analyzeConfig, validateConfig } from './stripper-analysis.js';
+// tools/validator-core.js - Enhanced with simple connection testing
+import { analyzeConfig } from './stripper-analysis.js';
 import { validateAgainstRules, calculateConfigScore } from '../shared/validation-rules.js';
 import { testConnection, generateConnectionReport } from '../shared/connection-tester.js';
 
@@ -42,7 +42,7 @@ export async function validateWithConnectionTest(config) {
         // Step 2: Connection test (if config is valid)
         let connectionReport = null;
         if (validationReport.isValid) {
-            connectionReport = await testConnection(validationReport.analysis, true);
+            connectionReport = await testConnection(validationReport.analysis);
         }
         
         // Step 3: Combined report
@@ -147,7 +147,7 @@ export function generateResultsHTML(report, includeConnection = false) {
                 </div>
                 ${includeConnection && connection ? `
                     <div style="margin-top: 10px; font-size: 0.9rem; color: #888;">
-                        Test Method: ${connection.method === 'external_api' ? '🌐 Multi-region' : '🔧 Basic'}
+                        Test Method: Browser Direct Test
                     </div>
                 ` : ''}
             </div>
@@ -174,6 +174,16 @@ export function generateResultsHTML(report, includeConnection = false) {
                     ${validation.analysis.sni ? `
                         <div><strong>SNI:</strong></div>
                         <div>${validation.analysis.sni}</div>
+                    ` : ''}
+                    
+                    ${validation.analysis.host ? `
+                        <div><strong>Host:</strong></div>
+                        <div>${validation.analysis.host}</div>
+                    ` : ''}
+                    
+                    ${validation.analysis.path ? `
+                        <div><strong>Path:</strong></div>
+                        <div>${validation.analysis.path}</div>
                     ` : ''}
                 </div>
             </div>
@@ -238,19 +248,20 @@ function generateConnectionHTML(connectionReport) {
                     <div>${connectionReport.latency}ms</div>
                 ` : ''}
                 
-                ${connectionReport.nodesTested ? `
-                    <div><strong>Nodes Tested:</strong></div>
-                    <div>${connectionReport.nodesTested} locations</div>
-                ` : ''}
-                
-                ${connectionReport.successRate ? `
-                    <div><strong>Success Rate:</strong></div>
-                    <div>${Math.round(connectionReport.successRate)}%</div>
+                ${connectionReport.protocol ? `
+                    <div><strong>Protocol:</strong></div>
+                    <div>${connectionReport.protocol.toUpperCase()}</div>
                 ` : ''}
                 
                 <div><strong>Method:</strong></div>
-                <div>${connectionReport.method === 'external_api' ? '🌐 Multi-region API' : '🔧 Basic Test'}</div>
+                <div>${connectionReport.method === 'browser_direct' ? '🔧 Browser Direct Test' : '🌐 External API'}</div>
             </div>
+            
+            ${connectionReport.error ? `
+                <div style="margin-top: 10px; padding: 10px; background: #2d1a1a; border-radius: 3px;">
+                    <strong>Error Details:</strong> ${connectionReport.error}
+                </div>
+            ` : ''}
         </div>
     `;
 }
@@ -262,12 +273,19 @@ function calculateOverallScore(validationReport, connectionReport) {
     
     // Adjust score based on connection test results
     if (connectionReport) {
-        if (connectionReport.overall === 'healthy') {
-            score += 10; // Bonus for good connection
-        } else if (connectionReport.overall === 'port_unreachable') {
-            score -= 20; // Penalty for port issues
-        } else if (connectionReport.overall === 'host_unreachable') {
-            score = 0; // Config is useless if host unreachable
+        const connectionResult = connectionReport.result;
+        
+        if (connectionResult && connectionResult.summary && connectionResult.summary.reachable) {
+            // Bonus for good connection
+            score += 15;
+            
+            // Extra bonus for low latency
+            if (connectionResult.summary.latency && connectionResult.summary.latency < 100) {
+                score += 5;
+            }
+        } else {
+            // Penalty for connection issues
+            score -= 25;
         }
     }
     
