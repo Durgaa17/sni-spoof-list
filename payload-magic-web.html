@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Payload Magic Ultimate v3.1 – Web Edition</title>
+    <style>
+        body { font-family: monospace; background: #000; color: #0f0; padding: 20px; }
+        pre { white-space: pre-wrap; }
+        button { background: #333; color: #0f0; border: 1px solid #0f0; padding: 10px; cursor: pointer; }
+        button:hover { background: #0f0; color: #000; }
+    </style>
+</head>
+<body>
+    <h1>Payload Magic v3.1 – Clean Mode (Web)</h1>
+    <p>SNI from GitHub | Targets from domains.txt | Browser Edition</p>
+    <button onclick="runScan()">Run Scan</button>
+    <pre id="output"></pre>
+
+    <script>
+        // CONFIG
+        const SNI_UPDATE_URL = 'https://raw.githubusercontent.com/Durgaa17/sni-spoof-list/refs/heads/main/sni-list.txt';
+        const DOMAINS_URL = 'https://raw.githubusercontent.com/Durgaa17/sni-spoof-list/refs/heads/main/domains.txt';  // Your domains.txt URL
+        const TLS_PORT = 443;
+        const TIMEOUT = 5000;
+
+        // Load SNI List from GitHub
+        async function loadSniList() {
+            try {
+                const resp = await fetch(SNI_UPDATE_URL);
+                const data = await resp.text();
+                const lines = data.split('\n').filter(l => l.trim() && !l.startsWith('#')).map(l => l.trim());
+                return lines;
+            } catch (e) {
+                console.error(e);
+                return ['www.speedtest.net', 'cdn.unifi.com.my', 'fast.com'];  // Fallback
+            }
+        }
+
+        // Load Domains from GitHub
+        async function loadDomains() {
+            try {
+                const resp = await fetch(DOMAINS_URL);
+                const data = await resp.text();
+                const lines = data.split('\n').filter(l => l.trim() && !l.startsWith('#')).map(l => l.trim());
+                return lines;
+            } catch (e) {
+                console.error(e);
+                return ['api.useinsider.com', 'unifi.com.my', 'www.speedtest.net'];  // Fallback
+            }
+        }
+
+        // CDN Detection (via fetch headers)
+        async function detectCdn(host) {
+            try {
+                const resp = await fetch(`https://${host}`, { timeout: TIMEOUT });
+                const headers = resp.headers;
+                const server = headers.get('server')?.toLowerCase() || '';
+                const cfRay = headers.get('cf-ray');
+                if (server.includes('cloudflare') || cfRay) return 'Cloudflare';
+                if (server.includes('amazon')) return 'AWS';
+                if (server.includes('akamai')) return 'Akamai';
+                return 'Direct';
+            } catch (e) {
+                return 'Unknown';
+            }
+        }
+
+        // SNI Spoof Test (simplified via fetch with custom headers)
+        async function testSniSpoof(host, sniList) {
+            let bestSni = null;
+            let bestTime = 999999;
+            for (const sni of sniList) {
+                if (sni === host) continue;
+                const start = performance.now();
+                try {
+                    const resp = await fetch(`https://${host}`, {
+                        method: 'GET',
+                        headers: {
+                            'Host': sni,  // SNI hint via Host header
+                            'User-Agent': 'PayloadMagic-Web'
+                        },
+                        signal: AbortSignal.timeout(TIMEOUT)
+                    });
+                    const elapsed = performance.now() - start;
+                    if (resp.ok) {
+                        if (elapsed < bestTime) {
+                            bestTime = elapsed;
+                            bestSni = sni;
+                        }
+                        break;  // Stop at first success
+                    }
+                } catch (e) {
+                    // Timeout/failed - continue
+                }
+            }
+            return { bestSni, bestTime: bestTime / 1000 };  // ms to s
+        }
+
+        // Main Scan Function
+        async function runScan() {
+            const output = document.getElementById('output');
+            output.innerHTML = 'Loading...\n';
+
+            const sniList = await loadSniList();
+            const domains = await loadDomains();
+
+            output.innerHTML += `Loaded ${sniList.length} SNI domains from GitHub\n`;
+            output.innerHTML += `Loaded ${domains.length} target domains from GitHub\n\n`;
+
+            output.innerHTML += '='.repeat(70) + '\n';
+            output.innerHTML += 'PAYLOAD MAGIC v3.1 – Web Clean Mode\n';
+            output.innerHTML += '='.repeat(70) + '\n\n';
+
+            for (const host of domains) {
+                output.innerHTML += `SCAN: ${host}\n`;
+
+                const cdn = await detectCdn(host);
+                const { bestSni, bestTime } = await testSniSpoof(host, sniList);
+
+                output.innerHTML += `  CDN: ${cdn}\n`;
+                if (bestSni) {
+                    const config = `vless://uuid@${host}:443?type=ws&security=tls&sni=${bestSni}&host=${host}#MY-ZT`;
+                    output.innerHTML += `  SNI: ${bestSni} (${bestTime.toFixed(2)}s)\n`;
+                    output.innerHTML += `  CONFIG: ${config}\n`;
+                } else {
+                    output.innerHTML += `  SNI: [FAILED]\n`;
+                }
+                output.innerHTML += '\n';
+            }
+
+            output.innerHTML += 'ALL DONE! NO FILES CREATED\n';
+        }
+    </script>
+</body>
+</html>
