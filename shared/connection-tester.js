@@ -390,3 +390,23 @@ export async function quickHealthCheck(server, port) {
         };
     }
 }
+
+// At the VERY END of shared/connection-tester.js - Add this:
+
+// Export all main functions
+export {
+    testConnection,
+    generateConnectionReport,
+    getTestRecommendation,
+    batchConnectionTest,
+    quickHealthCheck
+};
+
+// Or as default export for easier importing
+export default {
+    testConnection,
+    generateConnectionReport, 
+    getTestRecommendation,
+    batchConnectionTest,
+    quickHealthCheck
+};
