@@ -1,6 +1,8 @@
 # sni-spoof-list
 Sni list for Malaysian telco
 
+[![CI Validation](https://github.com/Durgaa17/sni-spoof-list/actions/workflows/ci.yml/badge.svg)](https://github.com/Durgaa17/sni-spoof-list/actions/workflows/ci.yml)
+
 # 🗂️ REPOSITORY STRUCTURE
 **Generated:** Sun Nov  2 20:26:28 UTC 2025
 **Branch:** refs/heads/main
