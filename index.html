@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>VLESS Builder + SNI Tester</title>
+  <title>VLESS Builder v3.0</title>
   <style>
     :root { --bg: #0d1117; --card: #161b22; --border: #30363d; --text: #58a6ff; --green: #238636; --red: #da3633; --gray: #8b949e; }
     body { background: var(--bg); color: var(--text); font-family: 'Courier New', monospace; padding: 20px; }
@@ -11,7 +11,7 @@
     h1 { color: white; margin-bottom: 10px; font-size: 1.6rem; }
     .form { background: var(--card); padding: 18px; border-radius: 8px; border: 1px solid var(--border); margin-bottom: 20px; }
     label { display: block; margin: 12px 0 6px; font-size: 0.9rem; color: var(--gray); }
-    input { width: 100%; padding: 10px; background: #0d1117; border: 1px solid var(--border); border-radius: 6px; color: white; font-family: inherit; }
+    input, select { width: 100%; padding: 10px; background: #0d1117; border: 1px solid var(--border); border-radius: 6px; color: white; font-family: inherit; }
     button { background: var(--green); color: white; border: none; padding: 12px 20px; border-radius: 6px; cursor: pointer; font-weight: bold; margin-top: 15px; width: 100%; }
     button:hover { background: #2ea043; }
     button:disabled { background: #30363d; cursor: not-allowed; }
@@ -21,41 +21,50 @@
     .success { color: #7ce38b; }
     .fail { color: var(--red); }
     .config { background: #000; padding: 10px; border-radius: 6px; margin-top: 10px; font-family: monospace; word-break: break-all; }
+    .disabled { opacity: 0.5; pointer-events: none; }
   </style>
 </head>
 <body>
   <div class="container">
-    <h1>VLESS Builder + SNI Tester</h1>
-    <p><small>Build + Test + Copy vless:// config</small></p>
+    <h1>VLESS Builder v3.0</h1>
+    <p><small>TLS / No TLS • SNI Auto-Disable • Real Test</small></p>
 
     <div class="form">
       <label>Target Domain</label>
       <input type="text" id="domain" placeholder="unifi.com.my" value="unifi.com.my" />
 
-      <label>SNI (Spoof)</label>
-      <input type="text" id="sni" placeholder="www.speedtest.net" value="www.speedtest.net" />
+      <label>Security</label>
+      <select id="security" onchange="toggleSNI()">
+        <option value="tls">TLS (SNI Required)</option>
+        <option value="none">No TLS (No SNI)</option>
+      </select>
+
+      <div id="sniField">
+        <label>SNI (Spoof)</label>
+        <input type="text" id="sni" placeholder="www.speedtest.net" value="www.speedtest.net" />
+      </div>
 
       <label>Host Header (optional)</label>
       <input type="text" id="hostHeader" placeholder="Leave empty = domain" />
 
-      <label>UUID (vless ID)</label>
-      <input type="text" id="uuid" placeholder="Generate or paste UUID" value="a1b2c3d4-e5f6-7890-g1h2-i3j4k5l6m7n8" />
+      <label>UUID</label>
+      <input type="text" id="uuid" placeholder="Paste or generate" value="a1b2c3d4-e5f6-7890-g1h2-i3j4k5l6m7n8" />
 
-      <label>Port (default 443)</label>
+      <label>Port</label>
       <input type="text" id="port" placeholder="443" value="443" />
 
-      <button onclick="runFullTest()" id="testBtn">Test SNI + Build</button>
+      <button onclick="runFullTest()" id="testBtn">Test + Build</button>
     </div>
 
     <div id="resultSection" style="display:none;">
       <div class="config" id="vlessConfig"></div>
       <div class="actions">
-        <button onclick="copyConfig()">Copy Config</button>
+        <button onclick="copyConfig()">Copy</button>
         <button onclick="testVlessLink()">Open in Nekobox</button>
       </div>
     </div>
 
-    <pre id="output">Enter values and click "Test SNI + Build"</pre>
+    <pre id="output">Ready. Choose TLS or No TLS.</pre>
   </div>
 
   <script src="scan.js"></script>
