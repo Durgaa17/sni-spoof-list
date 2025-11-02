@@ -1,0 +1,107 @@
+name: Auto-Update SNI List (ZeroTier/Free Data Focus)
+
+on:
+  schedule:
+    - cron: '0 2 * * *'  # Daily 2 AM UTC
+  workflow_dispatch:
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          pip install requests beautifulsoup4 lxml
+
+      - name: Scan & Update SNI List
+        id: scan
+        run: |
+          python -c "
+          import requests
+          from bs4 import BeautifulSoup
+          import re
+          from datetime import datetime
+
+          FILE = 'sni-list.txt'
+          existing = set()
+          with open(FILE) as f:
+              for line in f:
+                  line = line.strip()
+                  if line and not line.startswith('#'):
+                      existing.add(line)
+
+          new_domains = []
+
+          # 1. ZeroTier Discuss Forum
+          try:
+              r = requests.get('https://discuss.zerotier.com/search?q=free%20data%20malaysia', timeout=10)
+              soup = BeautifulSoup(r.text, 'lxml')
+              for a in soup.find_all('a', href=True):
+                  href = a['href']
+                  if 'unifi' in href or 'maxis' in href or 'cdn' in href:
+                      dom = re.findall(r'([a-z0-9-]+\.[a-z]{2,}\.[a-z]{2,})', href)
+                      new_domains.extend(dom)
+          except: pass
+
+          # 2. Reddit: r/malaysia + r/vpn
+          subreddits = ['malaysia', 'vpn', 'digitalnomad']
+          for sub in subreddits:
+              try:
+                  url = f'https://www.reddit.com/r/{sub}/search.json?q=free+data+unifi+OR+maxis+OR+zerotier&limit=20'
+                  r = requests.get(url, headers={'User-Agent': 'SNI-Scanner'}, timeout=10)
+                  posts = r.json().get('data', {}).get('children', [])
+                  for p in posts:
+                      body = p['data'].get('selftext', '') + p['data'].get('title', '')
+                      doms = re.findall(r'([a-z0-9-]+\.[a-z]{2,}\.[a-z]{2,})', body)
+                      new_domains.extend(doms)
+              except: pass
+
+          # 3. ISP Promo Pages (Free Data Zones)
+          promo_urls = [
+              'https://www.unifi.com.my/personal/promotions',
+              'https://www.maxis.com.my/promotions',
+              'https://www.celcom.com.my/promotions'
+          ]
+          for url in promo_urls:
+              try:
+                  r = requests.get(url, timeout=10)
+                  soup = BeautifulSoup(r.text, 'lxml')
+                  text = soup.get_text()
+                  doms = re.findall(r'([a-z0-9-]+\.(unifi|maxis|celcom)\.com\.my)', text)
+                  new_domains.extend(doms)
+              except: pass
+
+          # Filter
+          candidates = {d.lower() for d in new_domains 
+                       if d not in existing 
+                       and d.endswith(('.my', '.com', '.net', '.org'))
+                       and len(d.split('.')) >= 3}
+
+          if candidates:
+              with open(FILE, 'a') as f:
+                  f.write(f'\n# Auto-Added {datetime.utcnow().isoformat()} (v2 scanner)\n')
+                  for d in sorted(candidates):
+                      f.write(d + '\n')
+              print(f'ADDED {len(candidates)} NEW DOMAINS: {list(candidates)[:5]}...')
+          else:
+              print('No new domains found')
+          "
+
+      - name: Commit & Push
+        run: |
+          git config user.name "PayloadMagic Bot"
+          git config user.email "bot@payloadmagic.com"
+          git add sni-list.txt
+          if git diff --staged --quiet; then
+            echo "No changes"
+          else
+            git commit -m "Auto-update SNI: +$(git diff --staged --name-only | wc -l) domains"
+            git push origin HEAD:main
+          fi
