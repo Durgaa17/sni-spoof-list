@@ -15,7 +15,7 @@
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
-            padding: 20px;
+            padding: 15px;
         }
 
         .container {
@@ -23,18 +23,39 @@
             margin: 0 auto;
             background: white;
             border-radius: 10px;
-            padding: 30px;
+            padding: 20px;
             box-shadow: 0 10px 30px rgba(0,0,0,0.2);
         }
 
         h1 {
             text-align: center;
             color: #333;
-            margin-bottom: 30px;
+            margin-bottom: 20px;
+            font-size: clamp(1.5rem, 4vw, 2rem);
         }
 
         .input-section {
-            margin-bottom: 30px;
+            margin-bottom: 25px;
+        }
+
+        .input-header {
+            display: flex;
+            justify-content: between;
+            align-items: center;
+            margin-bottom: 10px;
+            gap: 10px;
+        }
+
+        .input-header h3 {
+            color: #333;
+            flex-grow: 1;
+            font-size: clamp(1rem, 3vw, 1.2rem);
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
         }
 
         textarea {
@@ -46,6 +67,7 @@
             font-family: monospace;
             font-size: 14px;
             resize: vertical;
+            min-height: 100px;
         }
 
         textarea:focus {
@@ -57,21 +79,28 @@
             background: #667eea;
             color: white;
             border: none;
-            padding: 12px 24px;
+            padding: 12px 20px;
             border-radius: 6px;
             cursor: pointer;
-            font-size: 16px;
-            margin: 10px 5px;
-            transition: background 0.3s;
+            font-size: clamp(0.9rem, 2.5vw, 1rem);
+            transition: all 0.3s;
+            flex: 1;
+            min-width: 120px;
         }
 
         button:hover {
             background: #5a6fd8;
+            transform: translateY(-1px);
+        }
+
+        button:active {
+            transform: translateY(0);
         }
 
         button:disabled {
             background: #ccc;
             cursor: not-allowed;
+            transform: none;
         }
 
         .output-section {
@@ -85,19 +114,21 @@
             padding: 15px;
             margin-top: 10px;
             position: relative;
+            word-break: break-all;
         }
 
         .output-content {
             font-family: monospace;
             white-space: pre-wrap;
-            word-break: break-all;
+            font-size: clamp(0.8rem, 2.5vw, 0.9rem);
+            line-height: 1.4;
         }
 
         .copy-btn {
-            position: absolute;
-            top: 10px;
-            right: 10px;
             background: #28a745;
+            margin-top: 15px;
+            width: 100%;
+            padding: 12px;
         }
 
         .copy-btn:hover {
@@ -108,22 +139,115 @@
             background: #17a2b8;
         }
 
+        .paste-btn {
+            background: #ff6b35;
+        }
+
+        .paste-btn:hover {
+            background: #e55a2b;
+        }
+
+        .strip-btn {
+            background: #667eea;
+        }
+
         .error {
             color: #dc3545;
             background: #f8d7da;
             border: 1px solid #f5c6cb;
-            padding: 10px;
+            padding: 12px;
             border-radius: 5px;
-            margin-top: 10px;
+            margin-top: 15px;
+            font-size: clamp(0.9rem, 2.5vw, 1rem);
         }
 
         .success {
             color: #155724;
             background: #d4edda;
             border: 1px solid #c3e6cb;
-            padding: 10px;
+            padding: 12px;
             border-radius: 5px;
-            margin-top: 10px;
+            margin-top: 15px;
+            font-size: clamp(0.9rem, 2.5vw, 1rem);
+        }
+
+        /* Mobile-specific styles */
+        @media (max-width: 768px) {
+            body {
+                padding: 10px;
+            }
+
+            .container {
+                padding: 15px;
+                border-radius: 8px;
+            }
+
+            textarea {
+                height: 100px;
+                padding: 12px;
+                font-size: 13px;
+            }
+
+            .button-group {
+                flex-direction: column;
+            }
+
+            button {
+                width: 100%;
+                min-width: auto;
+                padding: 14px;
+            }
+
+            .input-header {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .input-header h3 {
+                text-align: center;
+                margin-bottom: 10px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            body {
+                padding: 5px;
+            }
+
+            .container {
+                padding: 12px;
+            }
+
+            textarea {
+                height: 90px;
+                padding: 10px;
+                font-size: 12px;
+            }
+
+            button {
+                padding: 12px;
+            }
+        }
+
+        /* Loading animation */
+        .loading {
+            opacity: 0.7;
+            pointer-events: none;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #ffffff;
+            border-radius: 50%;
+            border-top-color: transparent;
+            animation: spin 1s ease-in-out infinite;
+            margin-right: 8px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
         }
     </style>
 </head>
@@ -132,11 +256,21 @@
         <h1>VLESS Config Stripper</h1>
         
         <div class="input-section">
+            <div class="input-header">
+                <h3>Paste VLESS Configuration:</h3>
+                <div class="button-group">
+                    <button class="paste-btn" id="pasteBtn">
+                        📋 Paste
+                    </button>
+                    <button class="strip-btn" id="stripBtn">
+                        ⚡ Strip
+                    </button>
+                </div>
+            </div>
             <textarea 
                 id="configInput" 
-                placeholder="Paste your VLESS configuration here..."
+                placeholder="Paste your VLESS configuration here or click the Paste button above..."
             ></textarea>
-            <button id="stripBtn">Strip Configuration</button>
         </div>
 
         <div id="message"></div>
@@ -145,8 +279,8 @@
             <h3>Stripped Configuration:</h3>
             <div class="output-box">
                 <div class="output-content" id="strippedConfig"></div>
-                <button class="copy-btn" id="copyBtn">Copy</button>
             </div>
+            <button class="copy-btn" id="copyBtn">📋 Copy Stripped Config</button>
         </div>
     </div>
 
