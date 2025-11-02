@@ -1,4 +1,4 @@
-// index.js - Main entry point for the SNI Tools Hub
+// index.js - Add new tools
 import { MODULE_PATHS } from './path.js';
 
 class HomePage {
@@ -16,11 +16,25 @@ class HomePage {
                 module: MODULE_PATHS.TOOLS.VLESS_STRIPPER
             },
             {
-                id: 'config-validator',
+                id: 'config-validator', 
                 title: 'Config Validator',
-                icon: '✅', 
-                description: 'Validate VLESS configurations for errors and best practices',
-                module: MODULE_PATHS.TOOLS.CONFIG_VALIDATOR  // ✅ FIXED - Consistent format
+                icon: '✅',
+                description: 'Validate VLESS configurations',
+                module: MODULE_PATHS.TOOLS.CONFIG_VALIDATOR
+            },
+            {
+                id: 'domains-viewer',    // NEW
+                title: 'Domains List',
+                icon: '🌐',
+                description: 'View available domains',
+                module: MODULE_PATHS.TOOLS.DOMAINS_VIEWER
+            },
+            {
+                id: 'sni-viewer',       // NEW
+                title: 'SNI List', 
+                icon: '🔒',
+                description: 'View available SNI domains',
+                module: MODULE_PATHS.TOOLS.SNI_VIEWER
             }
             // Add more tools here as needed using the same MODULE_PATHS format
         ];
