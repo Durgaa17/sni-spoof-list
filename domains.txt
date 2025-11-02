@@ -1,0 +1,56 @@
+# =====================================================
+# TARGET DOMAINS FOR SCAN – Malaysia ZeroTier Optimized
+# Add one domain per line | No http:// | No paths
+# =====================================================
+
+api.useinsider.com
+unifi.com.my
+www.speedtest.net
+fast.com
+cloudflare.com
+grab.com
+maybank2u.com.my
+astro.com.my
+celcom.com.my
+maxis.com.my
+airasia.com
+shopee.com.my
+lazada.com.my
+telekom.com.my
+tm.com.my
+digi.com.my
+yes.com.my
+hotlink.com.my
+u.com.my
+streamyx.com.my
+time.com.my
+streamline.com.my
+tm.net.my
+streamyx.tm.net.my
+unifi.tm.net.my
+hypp.tv
+tonton.com.my
+iflix.com
+netflix.com
+youtube.com
+google.com
+facebook.com
+instagram.com
+tiktok.com
+whatsapp.com
+telegram.org
+discord.com
+zoom.us
+microsoft.com
+apple.com
+samsung.com
+huawei.com
+xiaomi.com
+oppo.com
+vivo.com
+realme.com
+lenovo.com
+asus.com
+acer.com
+dell.com
+hp.com
