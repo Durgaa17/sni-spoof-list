@@ -1,4 +1,4 @@
-// shared/external/check-host-api.js - Real API implementation
+// shared/external/check-host-api.js - Focus on HTTP/HTTPS testing
 import { EXTERNAL_APIS } from './api-config.js';
 
 export class CheckHostAPI {
@@ -14,23 +14,12 @@ export class CheckHostAPI {
         return this.makeRequest('tcp', { host: `${hostname}:${port}` });
     }
 
-    async testHTTP(hostname, port = 443) {
-        const protocol = port === 443 ? 'https' : 'http';
-        return this.makeRequest('http', { 
-            host: `${protocol}://${hostname}:${port}` 
-        });
-    }
-
     async makeRequest(testType, params) {
         try {
             const endpoint = EXTERNAL_APIS.CHECK_HOST.ENDPOINTS[testType.toUpperCase()];
-            if (!endpoint) {
-                throw new Error(`Unknown test type: ${testType}`);
-            }
-
             const url = `${this.baseUrl}${endpoint}`;
             
-            console.log(`Making Check-Host API request to: ${url}`);
+            console.log(`Making API request to: ${url}`);
             
             const response = await fetch(url, {
                 method: 'POST',
@@ -48,22 +37,31 @@ export class CheckHostAPI {
             return this.formatResults(data, testType);
 
         } catch (error) {
-            console.error(`Check-Host API ${testType} test failed:`, error);
+            console.error(`API ${testType} test failed:`, error);
             return {
                 success: false,
-                error: error.message,
-                fallback: true
+                error: error.message
             };
         }
     }
 
     formatResults(apiData, testType) {
+        const nodes = this.parseNodes(apiData.nodes || {});
+        const successfulNodes = nodes.filter(node => node.status === 'success');
+        const latencies = successfulNodes.map(node => node.latency).filter(latency => latency);
+        
         return {
             success: true,
             testType: testType,
             requestId: apiData.request_id,
-            nodes: this.parseNodes(apiData.nodes || {}),
-            summary: this.generateSummary(apiData, testType)
+            nodes: nodes,
+            summary: {
+                totalNodes: nodes.length,
+                successfulNodes: successfulNodes.length,
+                successRate: nodes.length > 0 ? (successfulNodes.length / nodes.length) * 100 : 0,
+                averageLatency: latencies.length > 0 ? 
+                    latencies.reduce((sum, latency) => sum + latency, 0) / latencies.length : null
+            }
         };
     }
 
@@ -76,49 +74,31 @@ export class CheckHostAPI {
                 results.push({
                     node: nodeId,
                     status: result[0] === '1' ? 'success' : 'failed',
-                    latency: result[1] || null,
-                    error: result[2] || null
+                    latency: result[1] || null
                 });
             }
         }
         
         return results;
     }
-
-    generateSummary(apiData, testType) {
-        const nodes = this.parseNodes(apiData.nodes || {});
-        const successfulNodes = nodes.filter(node => node.status === 'success');
-        const latencies = successfulNodes.map(node => node.latency).filter(latency => latency);
-        
-        return {
-            totalNodes: nodes.length,
-            successfulNodes: successfulNodes.length,
-            successRate: nodes.length > 0 ? (successfulNodes.length / nodes.length) * 100 : 0,
-            averageLatency: latencies.length > 0 ? 
-                latencies.reduce((sum, latency) => sum + latency, 0) / latencies.length : null,
-            testType: testType
-        };
-    }
 }
 
-// Convenience function
+// Simplified connection test - only ping and TCP
 export async function quickConnectionTest(server, port) {
     const api = new CheckHostAPI();
     
     try {
-        const [ping, tcp, http] = await Promise.all([
+        const [ping, tcp] = await Promise.all([
             api.testPing(server),
-            api.testTCP(server, port),
-            api.testHTTP(server, port)
+            api.testTCP(server, port)
         ]);
 
-        return { ping, tcp, http };
+        return { ping, tcp };
     } catch (error) {
         console.error('Quick connection test failed:', error);
         return {
-            ping: { success: false, fallback: true },
-            tcp: { success: false, fallback: true },
-            http: { success: false, fallback: true }
+            ping: { success: false, error: error.message },
+            tcp: { success: false, error: error.message }
         };
     }
 }
