@@ -1,4 +1,4 @@
-// path.js - Central configuration for all module paths
+// path.js - Complete module paths
 export const MODULE_PATHS = {
     TOOLS: {
         VLESS_STRIPPER: 'tools/stripper.js',
@@ -8,13 +8,16 @@ export const MODULE_PATHS = {
         CONFIG_VALIDATOR: 'tools/validator.js',
         VALIDATOR_CORE: 'tools/validator-core.js',
         VALIDATOR_UI: 'tools/validator-ui.js'
-        // Add more tools here as needed
     },
     SHARED: {
         VALIDATION_RULES: 'shared/validation-rules.js',
-        CONNECTION_TESTER: 'shared/connection-tester.js',  // NEW
-        PING_TESTER: 'shared/ping-tester.js',             // NEW
-        PORT_TESTER: 'shared/port-tester.js'              // NEW
+        CONNECTION_TESTER: 'shared/connection-tester.js',
+        PING_TESTER: 'shared/ping-tester.js',
+        PORT_TESTER: 'shared/port-tester.js'
+    },
+    EXTERNAL: {
+        CHECK_HOST_API: 'shared/external/check-host-api.js',
+        API_CONFIG: 'shared/external/api-config.js'
     },
     ASSETS: {
         IMAGES: 'assets/images/',
