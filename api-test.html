@@ -1,42 +1,440 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>API Test - Fixed</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Check-Host.net API Debugger</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #0f0f0f;
+            color: #ffffff;
+            line-height: 1.6;
+        }
+        
+        h1, h2, h3 {
+            color: #667eea;
+        }
+        
+        .test-section {
+            background: #1a1a1a;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 10px;
+            border-left: 4px solid #667eea;
+        }
+        
+        .input-group {
+            margin: 15px 0;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #888;
+        }
+        
+        input, select {
+            width: 100%;
+            padding: 10px;
+            background: #2a2a2a;
+            border: 1px solid #444;
+            border-radius: 5px;
+            color: white;
+            font-size: 14px;
+        }
+        
+        button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            margin: 5px;
+            transition: background 0.3s;
+        }
+        
+        button:hover {
+            background: #5a6fd8;
+        }
+        
+        button:disabled {
+            background: #444;
+            cursor: not-allowed;
+        }
+        
+        .result {
+            margin: 15px 0;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        
+        .success {
+            background: #1a2d1a;
+            border-left: 4px solid #28a745;
+            color: #28a745;
+        }
+        
+        .error {
+            background: #2d1a1a;
+            border-left: 4px solid #dc3545;
+            color: #dc3545;
+        }
+        
+        .warning {
+            background: #2d2a1a;
+            border-left: 4px solid #ffc107;
+            color: #ffc107;
+        }
+        
+        .info {
+            background: #1a2a2a;
+            border-left: 4px solid #17a2b8;
+            color: #17a2b8;
+        }
+        
+        .log-entry {
+            margin: 5px 0;
+            padding: 8px;
+            background: #2a2a2a;
+            border-radius: 3px;
+            font-family: monospace;
+            font-size: 11px;
+        }
+        
+        .status-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 10px;
+            font-weight: bold;
+            margin-right: 8px;
+        }
+        
+        .status-success { background: #28a745; color: white; }
+        .status-error { background: #dc3545; color: white; }
+        .status-warning { background: #ffc107; color: black; }
+        .status-info { background: #17a2b8; color: white; }
+    </style>
 </head>
 <body>
-    <h1>Fixed Check-Host API Test</h1>
-    <button onclick="testFixedAPI()">Test Fixed API</button>
-    <div id="results"></div>
+    <h1>🔧 Check-Host.net API Debugger</h1>
+    
+    <!-- Section 1: Direct URL Testing -->
+    <div class="test-section">
+        <h2>1. Direct API URL Testing</h2>
+        <p>Test the exact API endpoints with manual URLs</p>
+        
+        <div class="input-group">
+            <label for="testUrl">API Endpoint URL:</label>
+            <input type="text" id="testUrl" value="https://check-host.net/check-ping?host=google.com&max_nodes=2" placeholder="Enter API URL">
+        </div>
+        
+        <button onclick="testDirectURL()">Test Direct URL</button>
+        <button onclick="testAllEndpoints()">Test All Endpoints</button>
+        
+        <div id="directResult" class="result" style="display: none;"></div>
+    </div>
+
+    <!-- Section 2: Our API Implementation Testing -->
+    <div class="test-section">
+        <h2>2. Our API Implementation Testing</h2>
+        <p>Test our CheckHostAPI class implementation</p>
+        
+        <div class="input-group">
+            <label for="testServer">Server:</label>
+            <input type="text" id="testServer" value="google.com" placeholder="Enter server hostname">
+        </div>
+        
+        <div class="input-group">
+            <label for="testPort">Port:</label>
+            <input type="text" id="testPort" value="443" placeholder="Enter port">
+        </div>
+        
+        <div class="input-group">
+            <label for="testNodes">Max Nodes:</label>
+            <input type="number" id="testNodes" value="2" min="1" max="10">
+        </div>
+        
+        <button onclick="testOurAPI()">Test Our API Implementation</button>
+        <button onclick="testQuickConnection()">Test Quick Connection</button>
+        <button onclick="runComprehensiveTest()">Run Comprehensive Test</button>
+        
+        <div id="apiResult" class="result" style="display: none;"></div>
+    </div>
+
+    <!-- Section 3: Live Log -->
+    <div class="test-section">
+        <h2>3. Live Debug Log</h2>
+        <p>Real-time logging of API requests and responses</p>
+        
+        <button onclick="clearLog()">Clear Log</button>
+        <button onclick="exportLog()">Export Log</button>
+        
+        <div id="debugLog" class="result info">
+            <!-- Log entries will appear here -->
+        </div>
+    </div>
 
     <script type="module">
-        import { testAPI } from './shared/external/check-host-api.js';
-        
-        async function testFixedAPI() {
-            const results = document.getElementById('results');
-            results.innerHTML = '<p>Testing fixed API implementation...</p>';
+        // Import our API implementation
+        import { CheckHostAPI, quickConnectionTest, testExactURLs } from './shared/external/check-host-api.js';
+
+        // Global log storage
+        let debugLog = [];
+
+        // Logging function
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = {
+                timestamp,
+                message,
+                type
+            };
+            
+            debugLog.push(logEntry);
+            
+            const logElement = document.getElementById('debugLog');
+            const badgeClass = `status-${type}`;
+            const badge = `<span class="status-badge ${badgeClass}">${type.toUpperCase()}</span>`;
+            
+            logElement.innerHTML += `
+                <div class="log-entry">
+                    ${badge} [${timestamp}] ${message}
+                </div>
+            `;
+            
+            // Auto-scroll to bottom
+            logElement.scrollTop = logElement.scrollHeight;
+        }
+
+        // Clear log function
+        function clearLog() {
+            debugLog = [];
+            document.getElementById('debugLog').innerHTML = '';
+            log('Log cleared', 'info');
+        }
+
+        // Export log function
+        function exportLog() {
+            const logText = debugLog.map(entry => 
+                `[${entry.timestamp}] ${entry.type.toUpperCase()}: ${entry.message}`
+            ).join('\n');
+            
+            const blob = new Blob([logText], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `api-debug-log-${Date.now()}.txt`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        // Test direct API URL
+        async function testDirectURL() {
+            const url = document.getElementById('testUrl').value;
+            const resultElement = document.getElementById('directResult');
+            
+            log(`Testing direct URL: ${url}`, 'info');
             
             try {
-                const apiTest = await testAPI();
+                resultElement.style.display = 'block';
+                resultElement.className = 'result info';
+                resultElement.textContent = 'Testing...';
                 
-                if (apiTest.apiWorking) {
-                    results.innerHTML += '<p style="color: green;">✅ API is WORKING!</p>';
-                    results.innerHTML += `<p>Ping: ${apiTest.ping.success ? '✅' : '❌'}</p>`;
-                    results.innerHTML += `<p>TCP: ${apiTest.tcp.success ? '✅' : '❌'}</p>`;
-                    
-                    if (apiTest.ping.success) {
-                        results.innerHTML += `<p>Ping Success Rate: ${apiTest.ping.summary.successRate}%</p>`;
-                    }
-                    if (apiTest.tcp.success) {
-                        results.innerHTML += `<p>TCP Success Rate: ${apiTest.tcp.summary.successRate}%</p>`;
-                    }
+                const startTime = Date.now();
+                const response = await fetch(url, {
+                    headers: { 'Accept': 'application/json' }
+                });
+                
+                const responseTime = Date.now() - startTime;
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    resultElement.className = 'result success';
+                    resultElement.textContent = `✅ SUCCESS (${responseTime}ms)\n\nResponse:\n${JSON.stringify(data, null, 2)}`;
+                    log(`Direct URL test SUCCESS: ${data.request_id} (${responseTime}ms)`, 'success');
                 } else {
-                    results.innerHTML += '<p style="color: red;">❌ API is NOT working</p>';
-                    results.innerHTML += `<p>Error: ${apiTest.error}</p>`;
+                    resultElement.className = 'result error';
+                    resultElement.textContent = `❌ FAILED: HTTP ${response.status} ${response.statusText}`;
+                    log(`Direct URL test FAILED: HTTP ${response.status}`, 'error');
                 }
             } catch (error) {
-                results.innerHTML += `<p style="color: red;">❌ Test failed: ${error.message}</p>`;
+                resultElement.className = 'result error';
+                resultElement.textContent = `❌ ERROR: ${error.message}`;
+                log(`Direct URL test ERROR: ${error.message}`, 'error');
             }
         }
+
+        // Test all endpoints
+        async function testAllEndpoints() {
+            const server = document.getElementById('testServer').value;
+            const endpoints = [
+                { name: 'Ping', url: `https://check-host.net/check-ping?host=${server}&max_nodes=1` },
+                { name: 'TCP', url: `https://check-host.net/check-tcp?host=${server}:80&max_nodes=1` },
+                { name: 'HTTP', url: `https://check-host.net/check-http?host=https://${server}&max_nodes=1` }
+            ];
+            
+            const resultElement = document.getElementById('directResult');
+            resultElement.style.display = 'block';
+            resultElement.className = 'result info';
+            resultElement.textContent = 'Testing all endpoints...\n\n';
+            
+            for (const endpoint of endpoints) {
+                try {
+                    log(`Testing ${endpoint.name} endpoint...`, 'info');
+                    resultElement.textContent += `Testing ${endpoint.name}... `;
+                    
+                    const response = await fetch(endpoint.url, {
+                        headers: { 'Accept': 'application/json' }
+                    });
+                    
+                    if (response.ok) {
+                        const data = await response.json();
+                        resultElement.textContent += `✅ SUCCESS (${data.request_id})\n`;
+                        log(`${endpoint.name} endpoint SUCCESS: ${data.request_id}`, 'success');
+                    } else {
+                        resultElement.textContent += `❌ FAILED (HTTP ${response.status})\n`;
+                        log(`${endpoint.name} endpoint FAILED: HTTP ${response.status}`, 'error');
+                    }
+                } catch (error) {
+                    resultElement.textContent += `❌ ERROR (${error.message})\n`;
+                    log(`${endpoint.name} endpoint ERROR: ${error.message}`, 'error');
+                }
+                
+                await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+        }
+
+        // Test our API implementation
+        async function testOurAPI() {
+            const server = document.getElementById('testServer').value;
+            const port = document.getElementById('testPort').value;
+            const maxNodes = document.getElementById('testNodes').value;
+            
+            const resultElement = document.getElementById('apiResult');
+            resultElement.style.display = 'block';
+            resultElement.className = 'result info';
+            resultElement.textContent = 'Testing our API implementation...\n\n';
+            
+            try {
+                const api = new CheckHostAPI();
+                
+                // Test ping
+                log(`Testing ping to ${server}...`, 'info');
+                resultElement.textContent += `Ping test... `;
+                const pingResult = await api.testPing(server, parseInt(maxNodes));
+                resultElement.textContent += pingResult.success ? '✅ SUCCESS\n' : '❌ FAILED\n';
+                log(`Ping test: ${pingResult.success ? 'SUCCESS' : 'FAILED'}`, pingResult.success ? 'success' : 'error');
+                
+                // Test TCP
+                log(`Testing TCP to ${server}:${port}...`, 'info');
+                resultElement.textContent += `TCP test... `;
+                const tcpResult = await api.testTCP(server, port, parseInt(maxNodes));
+                resultElement.textContent += tcpResult.success ? '✅ SUCCESS\n' : '❌ FAILED\n';
+                log(`TCP test: ${tcpResult.success ? 'SUCCESS' : 'FAILED'}`, tcpResult.success ? 'success' : 'error');
+                
+                // Show detailed results
+                resultElement.textContent += '\n--- DETAILED RESULTS ---\n\n';
+                resultElement.textContent += `Ping: ${JSON.stringify(pingResult.summary, null, 2)}\n\n`;
+                resultElement.textContent += `TCP: ${JSON.stringify(tcpResult.summary, null, 2)}\n`;
+                
+                resultElement.className = 'result success';
+                
+            } catch (error) {
+                resultElement.className = 'result error';
+                resultElement.textContent = `❌ ERROR: ${error.message}`;
+                log(`Our API test ERROR: ${error.message}`, 'error');
+            }
+        }
+
+        // Test quick connection
+        async function testQuickConnection() {
+            const server = document.getElementById('testServer').value;
+            const port = document.getElementById('testPort').value;
+            
+            const resultElement = document.getElementById('apiResult');
+            resultElement.style.display = 'block';
+            resultElement.className = 'result info';
+            resultElement.textContent = 'Testing quick connection...\n\n';
+            
+            try {
+                log(`Quick connection test to ${server}:${port}...`, 'info');
+                const result = await quickConnectionTest(server, port);
+                
+                resultElement.textContent = `Quick Connection Test Results:\n\n${JSON.stringify(result, null, 2)}`;
+                
+                if (result.ping.success || result.tcp.success) {
+                    resultElement.className = 'result success';
+                    log('Quick connection test SUCCESS', 'success');
+                } else {
+                    resultElement.className = 'result warning';
+                    log('Quick connection test has issues', 'warning');
+                }
+                
+            } catch (error) {
+                resultElement.className = 'result error';
+                resultElement.textContent = `❌ ERROR: ${error.message}`;
+                log(`Quick connection test ERROR: ${error.message}`, 'error');
+            }
+        }
+
+        // Comprehensive test
+        async function runComprehensiveTest() {
+            const testServers = [
+                { name: 'Google', server: 'google.com', port: 443 },
+                { name: 'GitHub', server: 'github.com', port: 443 },
+                { name: 'Cloudflare', server: 'cloudflare.com', port: 443 }
+            ];
+            
+            const resultElement = document.getElementById('apiResult');
+            resultElement.style.display = 'block';
+            resultElement.className = 'result info';
+            resultElement.textContent = 'Running comprehensive test...\n\n';
+            
+            for (const test of testServers) {
+                try {
+                    log(`Comprehensive test: ${test.name} (${test.server}:${test.port})`, 'info');
+                    resultElement.textContent += `Testing ${test.name} (${test.server}:${test.port})... `;
+                    
+                    const result = await quickConnectionTest(test.server, test.port);
+                    
+                    if (result.ping.success && result.tcp.success) {
+                        resultElement.textContent += `✅ FULL SUCCESS\n`;
+                        log(`${test.name}: FULL SUCCESS`, 'success');
+                    } else if (result.ping.success || result.tcp.success) {
+                        resultElement.textContent += `⚠️ PARTIAL SUCCESS\n`;
+                        log(`${test.name}: PARTIAL SUCCESS`, 'warning');
+                    } else {
+                        resultElement.textContent += `❌ FAILED\n`;
+                        log(`${test.name}: FAILED`, 'error');
+                    }
+                    
+                    await new Promise(resolve => setTimeout(resolve, 2000));
+                    
+                } catch (error) {
+                    resultElement.textContent += `❌ ERROR (${error.message})\n`;
+                    log(`${test.name}: ERROR - ${error.message}`, 'error');
+                }
+            }
+            
+            resultElement.textContent += '\n🎉 Comprehensive test completed!';
+        }
+
+        // Initialize
+        log('API Debugger initialized', 'info');
+        log('Ready to test Check-Host.net API endpoints', 'info');
     </script>
 </body>
 </html>
