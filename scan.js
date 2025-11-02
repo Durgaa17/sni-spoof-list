@@ -1,121 +1,52 @@
-class VlessStripper {
-    constructor() {
-        this.configInput = document.getElementById('configInput');
-        this.stripBtn = document.getElementById('stripBtn');
-        this.outputSection = document.getElementById('outputSection');
-        this.strippedConfig = document.getElementById('strippedConfig');
-        this.copyBtn = document.getElementById('copyBtn');
-        this.message = document.getElementById('message');
-        
-        this.initEventListeners();
+function stripConfig() {
+    const input = document.getElementById('input').value.trim();
+    if (!input) {
+        alert('Please paste a VLESS config');
+        return;
     }
 
-    initEventListeners() {
-        this.stripBtn.addEventListener('click', () => this.stripConfig());
-        this.copyBtn.addEventListener('click', () => this.copyToClipboard());
-    }
-
-    stripConfig() {
-        const input = this.configInput.value.trim();
-        
-        if (!input) {
-            this.showMessage('Please paste a VLESS configuration', 'error');
-            return;
-        }
-
-        try {
-            const stripped = this.processVlessConfig(input);
-            this.strippedConfig.textContent = stripped;
-            this.outputSection.style.display = 'block';
-            this.showMessage('Configuration stripped successfully!', 'success');
-        } catch (error) {
-            this.showMessage('Error: Invalid VLESS configuration', 'error');
-            this.outputSection.style.display = 'none';
-        }
-    }
-
-    processVlessConfig(config) {
-        // Clean the input
-        config = config.trim().replace(/["']/g, '');
-        
-        if (!config.startsWith('vless://')) {
-            throw new Error('Not a VLESS configuration');
-        }
-
-        // Parse the URL
-        const url = new URL(config);
+    try {
+        // Basic VLESS URL parsing
+        const url = new URL(input);
         const uuid = url.username;
         const server = url.hostname;
         const port = url.port;
-
-        // Get parameters (from search or hash)
-        const params = url.search || url.hash.replace('#', '?');
-        const searchParams = new URLSearchParams(params);
-
-        // Essential parameters in priority order
-        const essentialParams = [
-            'encryption',
-            'security', 
-            'type',
-            'sni',
-            'host',
-            'path',
-            'flow'
-        ];
-
-        // Build new URL with only essential parameters
-        let newParams = new URLSearchParams();
         
-        for (const param of essentialParams) {
-            const value = searchParams.get(param);
-            if (value) {
-                newParams.set(param, value);
+        // Get parameters
+        const params = new URLSearchParams(url.search);
+        
+        // Keep only essential parameters
+        const essential = new URLSearchParams();
+        
+        // Essential parameters in priority
+        const keepParams = ['encryption', 'security', 'type', 'sni', 'host', 'path', 'flow'];
+        
+        keepParams.forEach(param => {
+            if (params.get(param)) {
+                essential.set(param, params.get(param));
             }
-        }
-
-        // Set default encryption if not present
-        if (!newParams.get('encryption')) {
-            newParams.set('encryption', 'none');
-        }
-
-        // Build the stripped configuration
-        const stripped = `vless://${uuid}@${server}:${port}?${newParams.toString()}`;
-        return stripped;
-    }
-
-    copyToClipboard() {
-        const text = this.strippedConfig.textContent;
+        });
         
-        if (!text) return;
-
-        // Create temporary textarea for copying
-        const textarea = document.createElement('textarea');
-        textarea.value = text;
-        document.body.appendChild(textarea);
-        textarea.select();
-        
-        try {
-            document.execCommand('copy');
-            this.showMessage('Copied to clipboard!', 'success');
-        } catch (err) {
-            this.showMessage('Failed to copy', 'error');
+        // Set default encryption
+        if (!essential.get('encryption')) {
+            essential.set('encryption', 'none');
         }
         
-        document.body.removeChild(textarea);
-    }
-
-    showMessage(text, type) {
-        this.message.textContent = text;
-        this.message.className = type + ' message';
-        this.message.style.display = 'block';
+        // Build stripped URL
+        const stripped = `vless://${uuid}@${server}:${port}?${essential.toString()}`;
         
-        setTimeout(() => {
-            this.message.style.display = 'none';
-        }, 3000);
+        // Show result
+        document.getElementById('result').textContent = stripped;
+        document.getElementById('output').style.display = 'block';
+        
+    } catch (error) {
+        alert('Invalid VLESS configuration: ' + error.message);
     }
 }
 
-// Initialize when page loads
-document.addEventListener('DOMContentLoaded', () => {
-    new VlessStripper();
-});
+function copyConfig() {
+    const text = document.getElementById('result').textContent;
+    navigator.clipboard.writeText(text).then(() => {
+        alert('Copied to clipboard!');
+    });
+}
