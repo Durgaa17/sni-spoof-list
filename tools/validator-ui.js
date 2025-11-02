@@ -1,9 +1,10 @@
-// tools/validator-ui.js - Validator UI event handlers
-import { validateVlessConfig, generateResultsHTML } from './validator-core.js';
+// tools/validator-ui.js - Enhanced with connection testing
+import { validateVlessConfig, validateWithConnectionTest, generateResultsHTML } from './validator-core.js';
 
 export function initValidatorUI(container) {
     // Get elements
     const validateBtn = document.getElementById('validateBtn');
+    const validateWithConnectionBtn = document.getElementById('validateWithConnectionBtn');
     const input = document.getElementById('validatorInput');
     const resultsDiv = document.getElementById('validationResults');
     const errorDiv = document.getElementById('validatorError');
@@ -11,15 +12,22 @@ export function initValidatorUI(container) {
     // Add event listeners
     validateBtn.addEventListener('click', () => validateConfiguration({
         validateBtn, input, resultsDiv, errorDiv
-    }));
+    }, false));
 
-    // Auto-validate on paste
+    validateWithConnectionBtn.addEventListener('click', () => validateConfiguration({
+        validateBtn: validateWithConnectionBtn, 
+        input, 
+        resultsDiv, 
+        errorDiv
+    }, true));
+
+    // Auto-validate on paste (basic validation only)
     input.addEventListener('paste', (e) => {
         setTimeout(() => {
             if (input.value.trim().startsWith('vless://')) {
                 validateConfiguration({
                     validateBtn, input, resultsDiv, errorDiv
-                });
+                }, false);
             }
         }, 100);
     });
@@ -30,12 +38,12 @@ export function initValidatorUI(container) {
             e.preventDefault();
             validateConfiguration({
                 validateBtn, input, resultsDiv, errorDiv
-            });
+            }, false);
         }
     });
 }
 
-function validateConfiguration(elements) {
+async function validateConfiguration(elements, withConnectionTest = false) {
     const inputText = elements.input.value.trim();
     
     // Hide previous results and errors
@@ -54,29 +62,34 @@ function validateConfiguration(elements) {
 
     try {
         // Show loading state
-        elements.validateBtn.innerHTML = '⏳ Validating...';
+        const originalText = elements.validateBtn.innerHTML;
+        elements.validateBtn.innerHTML = withConnectionTest ? 
+            '🌐 Testing Connection...' : '⏳ Validating...';
         elements.validateBtn.disabled = true;
 
-        setTimeout(() => {
-            // Perform validation
-            const report = validateVlessConfig(inputText);
-            
-            // Display results
-            elements.resultsDiv.innerHTML = generateResultsHTML(report);
-            elements.resultsDiv.style.display = 'block';
-            
-            // Reset button
-            elements.validateBtn.innerHTML = '🔍 Validate Configuration';
-            elements.validateBtn.disabled = false;
+        let report;
+        
+        if (withConnectionTest) {
+            report = await validateWithConnectionTest(inputText);
+        } else {
+            report = validateVlessConfig(inputText);
+        }
+        
+        // Display results
+        elements.resultsDiv.innerHTML = generateResultsHTML(report, withConnectionTest);
+        elements.resultsDiv.style.display = 'block';
+        
+        // Reset button
+        elements.validateBtn.innerHTML = originalText;
+        elements.validateBtn.disabled = false;
 
-            // Scroll to results
-            elements.resultsDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-
-        }, 300);
+        // Scroll to results
+        elements.resultsDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 
     } catch (error) {
         showValidatorError('❌ Validation error: ' + error.message, elements);
-        elements.validateBtn.innerHTML = '🔍 Validate Configuration';
+        elements.validateBtn.innerHTML = elements.validateBtn.innerHTML.includes('Connection') ? 
+            '🌐 Validate + Connection Test' : '🔍 Validate Configuration';
         elements.validateBtn.disabled = false;
     }
 }
