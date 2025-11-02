@@ -1,13 +1,11 @@
-// scan.js – VLESS Builder v3.0 (TLS / No TLS + Real Test)
+// scan.js – VLESS Builder v3.1 (TLS Only + IP + Ping)
 const output = document.getElementById('output');
 const testBtn = document.getElementById('testBtn');
 const resultSection = document.getElementById('resultSection');
 const vlessConfig = document.getElementById('vlessConfig');
-const sniField = document.getElementById('sniField');
 
 let currentVlessLink = '';
 
-// CORS Proxy (reliable)
 const PROXY = 'https://api.allorigins.win/raw?url=';
 
 async function log(msg) {
@@ -20,16 +18,6 @@ function clearOutput() {
   resultSection.style.display = 'none';
 }
 
-function toggleSNI() {
-  const security = document.getElementById('security').value;
-  if (security === 'none') {
-    sniField.classList.add('disabled');
-    document.getElementById('sni').value = '';
-  } else {
-    sniField.classList.remove('disabled');
-  }
-}
-
 async function getRealIP(domain) {
   try {
     const res = await fetch(`https://dns.google/resolve?name=${domain}&type=A`);
@@ -40,9 +28,22 @@ async function getRealIP(domain) {
   }
 }
 
-async function testConnection(domain, port, useTLS, sni = '') {
-  const protocol = useTLS ? 'https' : 'http';
-  const url = `${protocol}://${domain}:${port}`;
+async function pingHost(host) {
+  try {
+    const start = performance.now();
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000);
+
+    await fetch(`https://${host}`, { signal: controller.signal, method: 'HEAD' });
+    const time = ((performance.now() - start) / 1000).toFixed(2);
+    return { alive: true, time };
+  } catch {
+    return { alive: false, time: 'N/A' };
+  }
+}
+
+async function testConnection(domain, port, sni) {
+  const url = `https://${domain}:${port}`;
   const proxyUrl = `${PROXY}${encodeURIComponent(url)}`;
 
   try {
@@ -50,12 +51,9 @@ async function testConnection(domain, port, useTLS, sni = '') {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 10000);
 
-    const headers = {};
-    if (useTLS && sni) headers['Host'] = sni;
-
     const res = await fetch(proxyUrl, {
       method: 'HEAD',
-      headers,
+      headers: { 'Host': sni },
       signal: controller.signal
     });
 
@@ -74,37 +72,36 @@ async function runFullTest() {
   clearOutput();
 
   const domain = document.getElementById('domain').value.trim();
-  const security = document.getElementById('security').value;
-  const sni = security === 'tls' ? document.getElementById('sni').value.trim() : '';
+  const sni = document.getElementById('sni').value.trim();
   const hostHeader = document.getElementById('hostHeader').value.trim() || domain;
   const uuid = document.getElementById('uuid').value.trim();
-  const port = document.getElementById('port').value.trim() || (security === 'tls' ? '443' : '80');
+  const port = document.getElementById('port').value.trim() || '443';
+  const pingCheck = document.getElementById('pingCheck').checked;
 
-  if (!domain || !uuid) {
-    log('<span class="fail">Error: Domain and UUID required</span>');
-    return;
-  }
-  if (security === 'tls' && !sni) {
-    log('<span class="fail">Error: SNI required for TLS</span>');
+  if (!domain || !sni || !uuid) {
+    log('<span class="fail">Error: Domain, SNI, and UUID required</span>');
     return;
   }
 
   testBtn.disabled = true;
   testBtn.textContent = 'Testing...';
-  log(`Testing: ${domain}:${port} (${security.toUpperCase()})\n`);
+  log(`Testing: ${domain}:${port}\nSNI: ${sni}\nHost: ${hostHeader}\n`);
 
-  if (security === 'tls') log(`SNI: ${sni}\n`);
-  log(`Host Header: ${hostHeader}\n`);
+  if (pingCheck) {
+    const pingResult = await pingHost(hostHeader);
+    log(`Ping Check: ${pingResult.alive ? '<span class="success">Alive</span>' : '<span class="fail">Dead</span>'} (${pingResult.time}s)`);
+    if (!pingResult.alive) {
+      log('<span class="fail">Host may be down. Proceed with caution.</span>\n');
+    }
+  }
 
-  const result = await testConnection(domain, port, security === 'tls', sni);
+  const result = await testConnection(domain, port, sni);
 
   log(`Result: <span class="${result.success ? 'success' : 'fail'}">${result.success ? '200 OK' : 'BLOCKED'}</span>`);
   log(`Time: ${result.time}s`);
   log(`Real IP: ${result.ip}\n`);
 
-  const securityParam = security === 'tls' ? 'tls' : 'none';
-  const sniParam = security === 'tls' ? `&sni=${sni}` : '';
-  const vless = `vless://${uuid}@${domain}:${port}?type=ws&security=${securityParam}${sniParam}&host=${hostHeader}#MY-ZT`;
+  const vless = `vless://${uuid}@${domain}:${port}?type=ws&security=tls&sni=${sni}&host=${hostHeader}#MY-ZT`;
   currentVlessLink = vless;
 
   vlessConfig.textContent = vless;
@@ -113,7 +110,7 @@ async function runFullTest() {
   if (result.success) {
     log(`<span class="success">VLESS Ready!</span>`);
   } else {
-    log(`<span class="fail">Connection failed. Check domain/port.</span>`);
+    log(`<span class="fail">SNI blocked or connection failed.</span>`);
   }
 
   testBtn.disabled = false;
