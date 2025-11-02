@@ -17,15 +17,20 @@ class VlessStripper {
         this.copyBtn.addEventListener('click', () => this.copyToClipboard());
         
         // Auto-strip when manual paste happens in textarea
-        this.configInput.addEventListener('paste', (e) => {
-            setTimeout(() => {
-                this.stripConfig();
-            }, 100);
+        this.configInput.addEventListener('input', (e) => {
+            // Auto-strip if it looks like a VLESS config
+            const value = e.target.value.trim();
+            if (value.includes('vless://') && value.length > 50) {
+                setTimeout(() => {
+                    this.stripConfig();
+                }, 500);
+            }
         });
 
         // Handle Enter key in textarea
         this.configInput.addEventListener('keydown', (e) => {
             if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                e.preventDefault();
                 this.stripConfig();
             }
         });
@@ -36,25 +41,39 @@ class VlessStripper {
             // Show loading state
             this.setButtonLoading(this.pasteBtn, true);
             
+            // Check if clipboard API is available
+            if (!navigator.clipboard || !navigator.clipboard.readText) {
+                throw new Error('Clipboard API not supported');
+            }
+            
             const text = await navigator.clipboard.readText();
+            if (!text) {
+                throw new Error('No text in clipboard');
+            }
+            
             this.configInput.value = text;
-            this.showMessage('Content pasted successfully!', 'success');
+            this.showMessage('Content pasted successfully! Stripping...', 'success');
             
             // Auto-strip after paste
             setTimeout(() => {
                 this.stripConfig();
-            }, 500);
+            }, 300);
             
         } catch (error) {
-            this.showMessage('Please allow clipboard permissions or paste manually', 'error');
-            console.error('Paste error:', error);
-            
-            // Fallback: focus on textarea for manual paste
-            this.configInput.focus();
-            this.showMessage('Please paste manually in the text area', 'error');
+            console.warn('Clipboard API failed, using fallback:', error);
+            this.fallbackPasteMethod();
         } finally {
             this.setButtonLoading(this.pasteBtn, false);
         }
+    }
+
+    fallbackPasteMethod() {
+        // Focus on textarea and show message for manual paste
+        this.configInput.focus();
+        this.showMessage('Please paste manually (Ctrl+V) in the text area above', 'error');
+        
+        // Select all text to make manual paste easier
+        this.configInput.select();
     }
 
     stripConfig() {
@@ -75,14 +94,17 @@ class VlessStripper {
                 this.strippedConfig.textContent = stripped;
                 this.showOutput();
                 this.showMessage('Configuration stripped successfully!', 'success');
+                
+                // Show config type detected
+                this.showConfigType(stripped);
             } catch (error) {
-                this.showMessage('Error: Invalid VLESS configuration format', 'error');
+                this.showMessage(`Error: ${error.message}`, 'error');
                 this.hideOutput();
                 console.error('Stripping error:', error);
             } finally {
                 this.setButtonLoading(this.stripBtn, false);
             }
-        }, 500);
+        }, 300);
     }
 
     processVlessConfig(config) {
@@ -100,36 +122,73 @@ class VlessStripper {
 
     parseVlessUrl(url) {
         try {
-            const parsed = new URL(url);
+            // Fix URL parsing for vless:// format
+            let cleanUrl = url;
+            if (!url.includes('?') && url.includes('#')) {
+                cleanUrl = url.replace('#', '?');
+            }
+            
+            const parsed = new URL(cleanUrl);
             
             // Extract basic components
             const uuid = parsed.username;
             const server = parsed.hostname;
             const port = parsed.port;
-            const params = new URLSearchParams(parsed.hash.substring(1));
             
-            // Get type (default to tcp if not specified)
+            // Get parameters from search OR hash (support both formats)
+            const searchParams = parsed.searchParams;
+            const hashParams = new URLSearchParams(parsed.hash.substring(1));
+            const params = searchParams.toString() ? searchParams : hashParams;
+            
+            // Essential parameters for WS and TLS
             const type = params.get('type') || 'tcp';
-            
-            // Get security (default to none if not specified)
             const security = params.get('security') || 'none';
+            const path = params.get('path') || '';
+            const host = params.get('host') || '';
+            const sni = params.get('sni') || '';
             
-            // Build stripped configuration
+            // Build stripped configuration - optimized for WS setups
             let stripped = `vless://${uuid}@${server}:${port}`;
             stripped += `?type=${type}&security=${security}`;
             
-            // Add essential parameters only
-            const essentialParams = ['path', 'host', 'sni', 'flow', 'encryption'];
-            essentialParams.forEach(param => {
-                if (params.get(param)) {
-                    stripped += `&${param}=${encodeURIComponent(params.get(param))}`;
+            // Add WebSocket specific parameters
+            if (type === 'ws') {
+                if (path) {
+                    stripped += `&path=${encodeURIComponent(path)}`;
                 }
-            });
+                if (host) {
+                    stripped += `&host=${encodeURIComponent(host)}`;
+                }
+            }
+            
+            // Add TLS specific parameters
+            if (security === 'tls' || security === 'reality') {
+                if (sni) {
+                    stripped += `&sni=${encodeURIComponent(sni)}`;
+                }
+                if (params.get('fp')) {
+                    stripped += `&fp=${params.get('fp')}`;
+                }
+                if (params.get('alpn')) {
+                    stripped += `&alpn=${params.get('alpn')}`;
+                }
+            }
+            
+            // Add flow for specific security types
+            if (params.get('flow')) {
+                stripped += `&flow=${params.get('flow')}`;
+            }
+            
+            // Add encryption if specified
+            if (params.get('encryption') && params.get('encryption') !== 'none') {
+                stripped += `&encryption=${params.get('encryption')}`;
+            }
             
             return stripped;
             
         } catch (error) {
-            throw new Error('Invalid VLESS URL format');
+            console.error('URL parsing error:', error);
+            throw new Error('Invalid VLESS URL format. Make sure it starts with vless://');
         }
     }
 
@@ -139,16 +198,42 @@ class VlessStripper {
             return config.replace(/["']/g, '').trim();
         }
         
-        // Try to extract UUID, server, port from various formats
+        // Try to extract common parameters
         const uuidMatch = config.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
         const serverMatch = config.match(/(?:server|host|address)[=:]\s*([^\s,]+)/i);
         const portMatch = config.match(/(?:port)[=:]\s*(\d+)/i);
+        const typeMatch = config.match(/(?:type)[=:]\s*(\w+)/i);
+        const pathMatch = config.match(/(?:path)[=:]\s*([^\s,]+)/i);
+        const sniMatch = config.match(/(?:sni|servername)[=:]\s*([^\s,]+)/i);
         
         if (uuidMatch && serverMatch && portMatch) {
-            return `vless://${uuidMatch[0]}@${serverMatch[1]}:${portMatch[1]}?type=tcp&security=none`;
+            const type = typeMatch ? typeMatch[1] : 'tcp';
+            const security = config.toLowerCase().includes('tls') ? 'tls' : 'none';
+            
+            let stripped = `vless://${uuidMatch[0]}@${serverMatch[1]}:${portMatch[1]}`;
+            stripped += `?type=${type}&security=${security}`;
+            
+            if (pathMatch && type === 'ws') {
+                stripped += `&path=${encodeURIComponent(pathMatch[1])}`;
+            }
+            
+            if (sniMatch && security === 'tls') {
+                stripped += `&sni=${encodeURIComponent(sniMatch[1])}`;
+            }
+            
+            return stripped;
         }
         
-        throw new Error('Could not parse configuration format');
+        throw new Error('Could not parse configuration format. Please use VLESS URL format.');
+    }
+
+    showConfigType(config) {
+        const type = config.includes('type=ws') ? 'WebSocket' : 'TCP';
+        const security = config.includes('security=tls') ? '+TLS' : '';
+        const message = `Detected: VLESS+${type}${security}`;
+        
+        // You can show this in a separate info box or log it
+        console.log(message);
     }
 
     async copyToClipboard() {
@@ -160,7 +245,14 @@ class VlessStripper {
         }
 
         try {
-            await navigator.clipboard.writeText(text);
+            // Try modern clipboard API first
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                await navigator.clipboard.writeText(text);
+            } else {
+                // Fallback method
+                this.fallbackCopyToClipboard(text);
+            }
+            
             this.copyBtn.textContent = '✅ Copied!';
             this.copyBtn.classList.add('copied');
             this.showMessage('Configuration copied to clipboard!', 'success');
@@ -170,9 +262,7 @@ class VlessStripper {
                 this.copyBtn.classList.remove('copied');
             }, 2000);
         } catch (error) {
-            this.showMessage('Failed to copy to clipboard', 'error');
-            
-            // Fallback method
+            console.error('Copy failed, using fallback:', error);
             this.fallbackCopyToClipboard(text);
         }
     }
@@ -180,14 +270,20 @@ class VlessStripper {
     fallbackCopyToClipboard(text) {
         const textArea = document.createElement('textarea');
         textArea.value = text;
+        textArea.style.position = 'fixed';
+        textArea.style.left = '-999999px';
+        textArea.style.top = '-999999px';
         document.body.appendChild(textArea);
+        textArea.focus();
         textArea.select();
+        
         try {
             document.execCommand('copy');
             this.showMessage('Configuration copied to clipboard!', 'success');
         } catch (err) {
-            this.showMessage('Failed to copy to clipboard', 'error');
+            this.showMessage('Failed to copy to clipboard. Please copy manually.', 'error');
         }
+        
         document.body.removeChild(textArea);
     }
 
@@ -210,7 +306,9 @@ class VlessStripper {
     showOutput() {
         this.outputSection.style.display = 'block';
         // Smooth scroll to output
-        this.outputSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        setTimeout(() => {
+            this.outputSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }, 100);
     }
 
     hideOutput() {
@@ -223,7 +321,9 @@ class VlessStripper {
         this.message.style.display = 'block';
         
         setTimeout(() => {
-            this.message.style.display = 'none';
+            if (this.message.textContent === text) {
+                this.message.style.display = 'none';
+            }
         }, 4000);
     }
 }
