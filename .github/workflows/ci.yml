@@ -1,0 +1,44 @@
+name: CI Validation
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Check file structure
+      run: |
+        required_files=("index.html" "style.css" "index.js")
+        for file in "${required_files[@]}"; do
+          if [ ! -f "$file" ]; then
+            echo "❌ Missing required file: $file"
+            exit 1
+          fi
+        done
+        echo "✅ All required files present"
+    
+    - name: Check HTML syntax
+      run: |
+        if ! which tidy >/dev/null 2>&1; then
+          sudo apt-get update && sudo apt-get install -y tidy
+        fi
+        # Basic HTML check
+        tidy -q -e index.html || true
+        
+    - name: Check JavaScript syntax
+      run: |
+        node -c index.js
+        if [ -d "tools" ]; then
+          for js_file in tools/*.js; do
+            if [ -f "$js_file" ]; then
+              node -c "$js_file"
+            fi
+          done
+        fi
+        echo "✅ JavaScript syntax is valid"
