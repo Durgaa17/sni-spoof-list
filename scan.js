@@ -1,12 +1,13 @@
-// scan.js – VLESS Builder + SNI Test + Copy + Open (FIXED)
+// scan.js – VLESS Builder v3.0 (TLS / No TLS + Real Test)
 const output = document.getElementById('output');
 const testBtn = document.getElementById('testBtn');
 const resultSection = document.getElementById('resultSection');
 const vlessConfig = document.getElementById('vlessConfig');
+const sniField = document.getElementById('sniField');
 
 let currentVlessLink = '';
 
-// CORS Proxy (free, public)
+// CORS Proxy (reliable)
 const PROXY = 'https://api.allorigins.win/raw?url=';
 
 async function log(msg) {
@@ -19,6 +20,16 @@ function clearOutput() {
   resultSection.style.display = 'none';
 }
 
+function toggleSNI() {
+  const security = document.getElementById('security').value;
+  if (security === 'none') {
+    sniField.classList.add('disabled');
+    document.getElementById('sni').value = '';
+  } else {
+    sniField.classList.remove('disabled');
+  }
+}
+
 async function getRealIP(domain) {
   try {
     const res = await fetch(`https://dns.google/resolve?name=${domain}&type=A`);
@@ -29,8 +40,9 @@ async function getRealIP(domain) {
   }
 }
 
-async function testSNI(domain, sni) {
-  const url = `https://${domain}`;
+async function testConnection(domain, port, useTLS, sni = '') {
+  const protocol = useTLS ? 'https' : 'http';
+  const url = `${protocol}://${domain}:${port}`;
   const proxyUrl = `${PROXY}${encodeURIComponent(url)}`;
 
   try {
@@ -38,13 +50,12 @@ async function testSNI(domain, sni) {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 10000);
 
+    const headers = {};
+    if (useTLS && sni) headers['Host'] = sni;
+
     const res = await fetch(proxyUrl, {
-      method: 'GET',
-      headers: {
-        'Host': sni,
-        'Origin': 'https://durgaa17.github.io',
-        'User-Agent': 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36'
-      },
+      method: 'HEAD',
+      headers,
       signal: controller.signal
     });
 
@@ -52,11 +63,7 @@ async function testSNI(domain, sni) {
     const time = ((performance.now() - start) / 1000).toFixed(2);
     const ip = await getRealIP(domain);
 
-    if (res.ok) {
-      return { success: true, time, ip };
-    } else {
-      return { success: false, time, ip };
-    }
+    return { success: res.ok, time, ip };
   } catch (e) {
     const ip = await getRealIP(domain);
     return { success: false, time: 'N/A', ip };
@@ -67,52 +74,62 @@ async function runFullTest() {
   clearOutput();
 
   const domain = document.getElementById('domain').value.trim();
-  const sni = document.getElementById('sni').value.trim();
+  const security = document.getElementById('security').value;
+  const sni = security === 'tls' ? document.getElementById('sni').value.trim() : '';
   const hostHeader = document.getElementById('hostHeader').value.trim() || domain;
   const uuid = document.getElementById('uuid').value.trim();
-  const port = document.getElementById('port').value.trim() || '443';
+  const port = document.getElementById('port').value.trim() || (security === 'tls' ? '443' : '80');
 
-  if (!domain || !sni || !uuid) {
-    log('<span class="fail">Error: Domain, SNI, and UUID required</span>');
+  if (!domain || !uuid) {
+    log('<span class="fail">Error: Domain and UUID required</span>');
+    return;
+  }
+  if (security === 'tls' && !sni) {
+    log('<span class="fail">Error: SNI required for TLS</span>');
     return;
   }
 
   testBtn.disabled = true;
-  testBtn.textContent = 'Testing SNI...';
-  log(`Testing: ${domain}\nSNI: ${sni}\nHost: ${hostHeader}\n`);
+  testBtn.textContent = 'Testing...';
+  log(`Testing: ${domain}:${port} (${security.toUpperCase()})\n`);
 
-  const result = await testSNI(domain, sni);
+  if (security === 'tls') log(`SNI: ${sni}\n`);
+  log(`Host Header: ${hostHeader}\n`);
+
+  const result = await testConnection(domain, port, security === 'tls', sni);
 
   log(`Result: <span class="${result.success ? 'success' : 'fail'}">${result.success ? '200 OK' : 'BLOCKED'}</span>`);
   log(`Time: ${result.time}s`);
   log(`Real IP: ${result.ip}\n`);
 
-  const vless = `vless://${uuid}@${domain}:${port}?type=ws&security=tls&sni=${sni}&host=${hostHeader}#MY-ZT`;
+  const securityParam = security === 'tls' ? 'tls' : 'none';
+  const sniParam = security === 'tls' ? `&sni=${sni}` : '';
+  const vless = `vless://${uuid}@${domain}:${port}?type=ws&security=${securityParam}${sniParam}&host=${hostHeader}#MY-ZT`;
   currentVlessLink = vless;
 
   vlessConfig.textContent = vless;
   resultSection.style.display = 'block';
 
   if (result.success) {
-    log(`<span class="success">VLESS Config Ready!</span>`);
+    log(`<span class="success">VLESS Ready!</span>`);
   } else {
-    log(`<span class="fail">SNI blocked. Try another SNI.</span>`);
+    log(`<span class="fail">Connection failed. Check domain/port.</span>`);
   }
 
   testBtn.disabled = false;
-  testBtn.textContent = 'Test SNI + Build';
+  testBtn.textContent = 'Test + Build';
 }
 
-// COPY TO CLIPBOARD
+// COPY
 function copyConfig() {
   navigator.clipboard.writeText(currentVlessLink).then(() => {
-    alert('Copied to clipboard!');
+    alert('Copied!');
   }).catch(() => {
-    prompt('Copy manually:', currentVlessLink);
+    prompt('Copy:', currentVlessLink);
   });
 }
 
-// OPEN IN NEKOBOX
+// OPEN NEKOBOX
 function testVlessLink() {
   const nekobox = `nekobox://import?url=${encodeURIComponent(currentVlessLink)}`;
   window.open(nekobox, '_blank');
