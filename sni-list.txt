@@ -1,0 +1,73 @@
+# =====================================================
+# PAYLOAD MAGIC SNI LIST – AUTO-UPDATE v1.0
+# Malaysia Zero-Tier Optimized | High-Traffic | CDN-Backed
+# Zero Login/WAF Risk | Tested Globally
+# Last Updated: 2025-11-02
+# =====================================================
+
+# --- MALAYSIA ISP & PUBLIC PORTALS ---
+www.unifi.com.my
+cdn.unifi.com.my
+static.unifi.com.my
+portal.unifi.com.my
+selfcare.unifi.com.my
+speedtest.unifi.com.my
+telemetry.unifi.com.my
+
+www.maxis.com.my
+hotspot.maxis.com.my
+speedtest.maxis.com.my
+cdn.maxis.com.my
+static.maxis.com.my
+
+www.celcom.com.my
+portal.celcom.com.my
+cdn.celcom.com.my
+
+www.astro.com.my
+cdn.astro.com.my
+static.astro.com.my
+
+www.airasia.com
+cdn.airasia.com
+
+www.maybank2u.com.my
+cdn.maybank2u.com.my
+
+www.grab.com
+cdn.grab.com
+telemetry.grab.com
+
+www.malaysia.gov.my
+cdn.gov.my
+
+# --- SPEEDTEST & TELEMETRY (GLOBAL + MY) ---
+www.speedtest.net
+cdn.speedtest.net
+telemetry.speedtest.net
+a.st.speedtest.net
+
+cdn.opensignal.com
+telemetry.opensignal.com
+
+fast.com
+cdn.fast.com
+
+# --- CODECADEMY & LEARNING ---
+codecademy.com
+cdn.codecademy.com
+static.codecademy.com
+
+# --- ZERO-TIER PUBLIC DOMAINS ---
+zerotier.com
+my.zerotier.net
+central.zerotier.com
+home.arpa
+
+# --- EXTRA HIGH-SUCCESS CDN DOMAINS ---
+static.cloudflareinsights.com
+ajax.googleapis.com
+login.microsoftonline.com
+d1.awsstatic.com
+akamaiedge.net
+connectivitycheck.gstatic.com
