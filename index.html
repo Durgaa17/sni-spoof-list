@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Payload Magic v3.1 – Web Scanner</title>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0d1117;
+      --text: #58a6ff;
+      --accent: #238636;
+      --card: #161b22;
+      --border: #30363d;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Roboto Mono', monospace;
+      padding: 20px;
+      line-height: 1.6;
+    }
+    .container { max-width: 800px; margin: 0 auto; }
+    h1 { font-size: 1.8rem; margin-bottom: 10px; color: #fff; }
+    p { margin-bottom: 20px; font-size: 0.9rem; }
+    button {
+      background: var(--accent);
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      font-family: inherit;
+      font-size: 1rem;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: 0.2s;
+    }
+    button:hover { background: #2ea043; }
+    #output {
+      background: var(--card);
+      border: 1px solid var(--border);
+      padding: 15px;
+      margin-top: 20px;
+      border-radius: 8px;
+      white-space: pre-wrap;
+      font-size: 0.9rem;
+      min-height: 200px;
+      overflow-y: auto;
+    }
+    .status { font-size: 0.8rem; color: #8b949e; margin-top: 10px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Payload Magic v3.1</h1>
+    <p>SNI Spoof Scanner – Malaysia Telco Optimized<br>
+       <small>Live SNI from GitHub • Targets from <code>domains.txt</code></small>
+    </p>
+    <button onclick="runScan()">Run Scan</button>
+    <div class="status" id="status">Ready</div>
+    <pre id="output"></pre>
+  </div>
+
+  <script src="scan.js"></script>
+</body>
+</html>
