@@ -3,98 +3,29 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VLESS Stripper</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            max-width: 800px;
-            margin: 0 auto;
-            padding: 20px;
-        }
-        textarea {
-            width: 100%;
-            height: 100px;
-            margin: 10px 0;
-        }
-        button {
-            padding: 10px 20px;
-            margin: 5px;
-        }
-        .output {
-            background: #f5f5f5;
-            padding: 15px;
-            margin: 10px 0;
-            border-radius: 5px;
-            word-break: break-all;
-        }
-    </style>
+    <title>SNI Tools Hub</title>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <h1>VLESS Config Stripper</h1>
-    
-    <textarea id="input" placeholder="Paste VLESS config here..."></textarea>
-    <br>
-    <button onclick="stripConfig()">Strip Config</button>
-    
-    <div id="output" class="output" style="display:none;">
-        <h3>Stripped Config:</h3>
-        <pre id="result"></pre>
-        <button onclick="copyConfig()">Copy</button>
+    <div class="container">
+        <header>
+            <h1>SNI Tools Hub</h1>
+            <p class="tagline">Essential tools for network configuration and management</p>
+        </header>
+
+        <div class="tools-grid" id="toolsGrid">
+            <!-- Tools loaded by index.js -->
+        </div>
+
+        <div class="content-area" id="contentArea">
+            <!-- Dynamic content loaded here -->
+        </div>
+
+        <footer>
+            <p>&copy; 2024 SNI Tools Hub. Open Source Project.</p>
+        </footer>
     </div>
 
-    <script>
-        function stripConfig() {
-            const input = document.getElementById('input').value.trim();
-            if (!input) {
-                alert('Please paste a VLESS config');
-                return;
-            }
-
-            try {
-                // Basic VLESS URL parsing
-                const url = new URL(input);
-                const uuid = url.username;
-                const server = url.hostname;
-                const port = url.port;
-                
-                // Get parameters
-                const params = new URLSearchParams(url.search);
-                
-                // Keep only essential parameters
-                const essential = new URLSearchParams();
-                
-                // Essential parameters in priority
-                const keepParams = ['encryption', 'security', 'type', 'sni', 'host', 'path', 'flow'];
-                
-                keepParams.forEach(param => {
-                    if (params.get(param)) {
-                        essential.set(param, params.get(param));
-                    }
-                });
-                
-                // Set default encryption
-                if (!essential.get('encryption')) {
-                    essential.set('encryption', 'none');
-                }
-                
-                // Build stripped URL
-                const stripped = `vless://${uuid}@${server}:${port}?${essential.toString()}`;
-                
-                // Show result
-                document.getElementById('result').textContent = stripped;
-                document.getElementById('output').style.display = 'block';
-                
-            } catch (error) {
-                alert('Invalid VLESS configuration: ' + error.message);
-            }
-        }
-
-        function copyConfig() {
-            const text = document.getElementById('result').textContent;
-            navigator.clipboard.writeText(text).then(() => {
-                alert('Copied to clipboard!');
-            });
-        }
-    </script>
+    <script src="index.js"></script>
 </body>
 </html>
