@@ -5,6 +5,7 @@
 
 api.useinsider.com
 www.speedtest.net
+cdn.opensignal.com
 unifi.com.my
 fast.com
 cloudflare.com
