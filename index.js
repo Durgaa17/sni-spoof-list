@@ -6,7 +6,7 @@ class HomePage {
         this.toolsGrid = document.getElementById('toolsGrid');
         this.contentArea = document.getElementById('contentArea');
         
-        // Define all available tools using paths from path.js
+        // Define all available tools using consistent MODULE_PATHS
         this.tools = [
             {
                 id: 'vless-stripper',
@@ -16,13 +16,13 @@ class HomePage {
                 module: MODULE_PATHS.TOOLS.VLESS_STRIPPER
             },
             {
-    id: 'config-validator',
-    title: 'Config Validator',
-    icon: '✅', 
-    description: 'Validate VLESS configurations',
-    module: './tools/validator.js'  // Try with ./ prefix
-}
-            // Add more tools here as needed
+                id: 'config-validator',
+                title: 'Config Validator',
+                icon: '✅', 
+                description: 'Validate VLESS configurations for errors and best practices',
+                module: MODULE_PATHS.TOOLS.CONFIG_VALIDATOR  // ✅ FIXED - Consistent format
+            }
+            // Add more tools here as needed using the same MODULE_PATHS format
         ];
         
         this.init();
