@@ -3,6 +3,7 @@ export const MODULE_PATHS = {
     TOOLS: {
         VLESS_STRIPPER: 'tools/stripper.js',
         // Add more tools here as you create them
+        STRIPPER_ANALYSIS: 'tools/stripper-analysis.js',  // NEW
         CONFIG_VALIDATOR: 'tools/validator.js',
         SNI_CHECKER: 'tools/sni-checker.js'
     },
