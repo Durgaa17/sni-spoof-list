@@ -1,81 +1,99 @@
-// scan.js – Payload Magic v3.2 Core (NO QR)
-const SNI_URL = 'https://raw.githubusercontent.com/Durgaa17/sni-spoof-list/main/sni-list.txt';
+// scan.js – Real SNI + IP Checker (GitHub Pages)
 const DOMAINS_URL = 'https://raw.githubusercontent.com/Durgaa17/sni-spoof-list/main/domains.txt';
-const TIMEOUT = 8000;
+const SNI_URL = 'https://raw.githubusercontent.com/Durgaa17/sni-spoof-list/main/sni-list.txt';
 
 const output = document.getElementById('output');
-const status = document.getElementById('status');
 
 async function log(msg) {
   output.innerHTML += msg + '\n';
   output.scrollTop = output.scrollHeight;
 }
 
-async function setStatus(msg) {
-  status.textContent = msg;
+async function fetchText(url) {
+  const res = await fetch(url);
+  return await res.text();
 }
 
-async function fetchText(url) {
-  const controller = new AbortController();
-  const id = setTimeout(() => controller.abort(), TIMEOUT);
+async function getRealIP(host) {
   try {
-    const res = await fetch(url, { signal: controller.signal });
-    clearTimeout(id);
-    return await res.text();
-  } catch (e) {
-    clearTimeout(id);
-    throw e;
+    const res = await fetch(`https://dns.google/resolve?name=${host}&type=A`);
+    const data = await res.json();
+    return data.Answer?.[0]?.data || 'Unknown';
+  } catch {
+    return 'Unknown';
   }
 }
 
-async function loadList(url, name) {
-  setStatus(`Loading ${name}...`);
-  const text = await fetchText(url);
-  const lines = text.split('\n').map(l => l.trim()).filter(l => l && !l.startsWith('#'));
-  await log(`Result: [LIVE] ${lines.length} ${name} loaded`);
-  return lines;
+async function testSNI(host, sni) {
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 6000);
+
+    const res = await fetch(`https://${host}`, {
+      headers: { 'Host': sni },
+      signal: controller.signal,
+      mode: 'no-cors' // Required for SNI hint
+    });
+
+    clearTimeout(timeout);
+
+    // no-cors = opaque response, but connection succeeded = SNI likely worked
+    const ip = await getRealIP(host);
+    return { sni, ip, works: true };
+  } catch (e) {
+    return null;
+  }
 }
 
-async function runScan() {
-  clearOutput();
+async function runCheck() {
+  output.innerHTML = '';
+  log('Loading domains and SNI list...\n');
 
-  await log('### PAYLOAD MAGIC v3.2 – FULL SCAN');
-  await log('Starting...\n');
+  let domains = [], sniList = [];
 
-  let sniList = [];
-  let domains = [];
+  try {
+    const [domText, sniText] = await Promise.all([
+      fetchText(DOMAINS_URL),
+      fetchText(SNI_URL)
+    ]);
 
-  try { sniList = await loadList(SNI_URL, 'SNI'); }
-  catch { await log('Result: [ERROR] SNI load failed'); sniList = ['www.speedtest.net']; }
+    domains = domText.split('\n').map(l => l.trim()).filter(l => l && !l.startsWith('#'));
+    sniList = sniText.split('\n').map(l => l.trim()).filter(l => l && !l.startsWith('#'));
 
-  try { domains = await loadList(DOMAINS_URL, 'domains'); }
-  catch { await log('Result: [ERROR] Domains load failed'); domains = ['unifi.com.my']; }
+    log(`Loaded ${domains.length} domains`);
+    log(`Loaded ${sniList.length} SNI entries\n`);
+  } catch (e) {
+    log('Failed to load files: ' + e.message);
+    return;
+  }
 
-  await log('\n' + '='.repeat(70));
-  await log('SCAN RESULTS');
-  await log('='.repeat(70) + '\n');
+  log('=' .repeat(70));
+  log('SNI + IP CHECK RESULTS');
+  log('=' .repeat(70) + '\n');
 
   for (const host of domains) {
-    await log(`SCAN: ${host}`);
-    
-    const cdn = await detectCdn(host);
-    await log(`  CDN: ${cdn}`);
+    log(`TARGET: ${host}`);
+    let found = false;
 
-    const tlsResult = await testFullTls(host, sniList);
-    if (tlsResult) {
-      await log(`  TLS: ${tlsResult.sni} (${tlsResult.time}s) [HTTP/${tlsResult.http3 ? '3' : '2'}]`);
-      const config = `vless://uuid@${host}:443?type=ws&security=tls&sni=${tlsResult.sni}&host=${host}#MY-ZT`;
-      await log(`  CONFIG: ${config}`);
-    } else {
-      await log(`  TLS: [FAILED]`);
+    for (const sni of sniList) {
+      if (sni === host) continue;
+
+      const result = await testSNI(host, sni);
+      if (result) {
+        log(`  SNI: <span class="success">${sni}</span>`);
+        log(`  IP: <span class="success">${result.ip}</span>`);
+        log(`  CONFIG: vless://uuid@${host}:443?type=ws&security=tls&sni=${sni}&host=${host}#MY-ZT\n`);
+        found = true;
+        break;
+      }
     }
-    await log('');
+
+    if (!found) {
+      const ip = await getRealIP(host);
+      log(`  SNI: <span class="fail">[BLOCKED]</span>`);
+      log(`  IP: ${ip}\n`);
+    }
   }
 
-  await log('ALL DONE!');
-  setStatus('Scan complete');
-}
-
-function clearOutput() {
-  output.innerHTML = '';
+  log('SCAN COMPLETE!');
 }
