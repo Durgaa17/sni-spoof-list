@@ -16,12 +16,12 @@ class HomePage {
                 module: MODULE_PATHS.TOOLS.VLESS_STRIPPER
             },
             {
-                id: 'config-validator',
-                title: 'Config Validator', 
-                icon: '✅',
-                description: 'Validate VLESS configurations for errors and best practices',
-                module: MODULE_PATHS.TOOLS.CONFIG_VALIDATOR
-            }
+    id: 'config-validator',
+    title: 'Config Validator',
+    icon: '✅', 
+    description: 'Validate VLESS configurations',
+    module: './tools/validator.js'  // Try with ./ prefix
+}
             // Add more tools here as needed
         ];
         
