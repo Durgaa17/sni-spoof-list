@@ -8,9 +8,8 @@ class HomePage {
                 title: 'VLESS Stripper',
                 icon: '⚡',
                 description: 'Strip VLESS configurations to basic parameters',
-                module: './tools/stripper.js'
+                module: 'tools/stripper.js'  // Remove ./ prefix
             }
-            // Add more tools here later...
         ];
         
         this.init();
@@ -64,8 +63,8 @@ class HomePage {
                 </div>
             `;
 
-            // Load the tool module
-            const module = await import(tool.module);
+            // Load the tool module - use relative path from current directory
+            const module = await import('./' + tool.module);
             
             // Clear content
             this.contentArea.innerHTML = '';
@@ -91,7 +90,7 @@ class HomePage {
                     <h3>Failed to load tool</h3>
                     <p>${error.message}</p>
                     <p style="font-size: 0.9rem; color: #888; margin-top: 10px;">
-                        File: ${tool.module}
+                        File path: ${tool.module}
                     </p>
                     <button class="back-btn" onclick="homePage.showHome()">Back to Home</button>
                 </div>
