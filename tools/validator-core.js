@@ -1,6 +1,7 @@
-// tools/validator-core.js - Phase 1: Basic Validation
+// tools/validator-core.js - Phase 2: Enhanced with Connection Testing
 import { analyzeConfig, validateConfig } from './stripper-analysis.js';
 import { validateAgainstRules, calculateConfigScore } from '../shared/validation-rules.js';
+import { testConnection, generateConnectionReport } from '../shared/connection-tester.js';
 
 export function validateVlessConfig(config) {
     try {
@@ -33,6 +34,42 @@ export function validateVlessConfig(config) {
     }
 }
 
+export async function validateWithConnectionTest(config) {
+    try {
+        // Step 1: Basic validation
+        const validationReport = validateVlessConfig(config);
+        
+        // Step 2: Connection test (if config is valid)
+        let connectionReport = null;
+        if (validationReport.isValid) {
+            connectionReport = await testConnection(validationReport.analysis, true);
+        }
+        
+        // Step 3: Combined report
+        return {
+            validation: validationReport,
+            connection: connectionReport,
+            overallScore: calculateOverallScore(validationReport, connectionReport),
+            timestamp: new Date().toISOString()
+        };
+
+    } catch (error) {
+        return {
+            validation: {
+                isValid: false,
+                errors: ['Validation failed: ' + error.message],
+                warnings: [],
+                suggestions: [],
+                score: 0,
+                analysis: null
+            },
+            connection: null,
+            overallScore: 0,
+            timestamp: new Date().toISOString()
+        };
+    }
+}
+
 export function getValidatorHTML() {
     return `
         <div class="config-validator">
@@ -53,9 +90,14 @@ export function getValidatorHTML() {
                 ></textarea>
             </div>
             
-            <button class="stripper-btn" id="validateBtn">
-                🔍 Validate Configuration
-            </button>
+            <div style="display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap;">
+                <button class="stripper-btn" id="validateBtn" style="flex: 1;">
+                    🔍 Validate Configuration
+                </button>
+                <button class="stripper-btn" id="validateWithConnectionBtn" style="flex: 1; background: #17a2b8;">
+                    🌐 Validate + Connection Test
+                </button>
+            </div>
             
             <div style="margin: 20px 0; text-align: center; color: #666;">
                 ↓
@@ -73,12 +115,22 @@ export function getValidatorHTML() {
     `;
 }
 
-export function generateResultsHTML(report) {
-    const scoreColor = report.score >= 80 ? '#28a745' : 
-                      report.score >= 60 ? '#ffc107' : '#dc3545';
+export function generateResultsHTML(report, includeConnection = false) {
+    const validation = report.validation || report;
+    const connection = report.connection;
     
-    const scoreEmoji = report.score >= 80 ? '🎉' : 
-                      report.score >= 60 ? '⚠️' : '❌';
+    const scoreColor = validation.score >= 80 ? '#28a745' : 
+                      validation.score >= 60 ? '#ffc107' : '#dc3545';
+    
+    const scoreEmoji = validation.score >= 80 ? '🎉' : 
+                      validation.score >= 60 ? '⚠️' : '❌';
+
+    let connectionHTML = '';
+    
+    if (includeConnection && connection) {
+        const connectionReport = generateConnectionReport(connection);
+        connectionHTML = generateConnectionHTML(connectionReport);
+    }
 
     return `
         <div class="validation-results">
@@ -86,72 +138,140 @@ export function generateResultsHTML(report) {
             <div style="text-align: center; margin-bottom: 25px; padding: 20px; background: #1a1a1a; border-radius: 10px; border-left: 4px solid ${scoreColor};">
                 <div style="font-size: 2rem; margin-bottom: 10px;">${scoreEmoji}</div>
                 <h3 style="margin: 0 0 5px 0; color: ${scoreColor};">
-                    ${report.isValid ? 'VALID CONFIGURATION' : 'INVALID CONFIGURATION'}
+                    ${validation.isValid ? 'VALID CONFIGURATION' : 'INVALID CONFIGURATION'}
                 </h3>
                 <div style="font-size: 1.5rem; font-weight: bold; color: ${scoreColor};">
-                    Score: ${report.score}/100
+                    ${includeConnection && report.overallScore ? 
+                      `Overall Score: ${report.overallScore}/100` : 
+                      `Score: ${validation.score}/100`}
                 </div>
+                ${includeConnection && connection ? `
+                    <div style="margin-top: 10px; font-size: 0.9rem; color: #888;">
+                        Test Method: ${connection.method === 'external_api' ? '🌐 Multi-region' : '🔧 Basic'}
+                    </div>
+                ` : ''}
             </div>
+
+            <!-- Connection Test Results -->
+            ${connectionHTML}
 
             <!-- Configuration Analysis -->
             <div style="margin-bottom: 20px; padding: 15px; background: #1a1a1a; border-radius: 5px;">
                 <h4 style="margin-bottom: 10px;">📊 Configuration Analysis</h4>
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 0.9rem;">
                     <div><strong>Protocol:</strong></div>
-                    <div>${report.analysis.protocol}</div>
+                    <div>${validation.analysis.protocol}</div>
                     
                     <div><strong>Security:</strong></div>
-                    <div>${report.analysis.hasTLS ? '🔒 TLS' : '⚠️ None'}</div>
+                    <div>${validation.analysis.hasTLS ? '🔒 TLS' : '⚠️ None'}</div>
                     
                     <div><strong>Type:</strong></div>
-                    <div>${report.analysis.hasWebSocket ? '🕸️ WebSocket' : '🔗 TCP'}</div>
+                    <div>${validation.analysis.hasWebSocket ? '🕸️ WebSocket' : '🔗 TCP'}</div>
                     
                     <div><strong>Server:</strong></div>
-                    <div>${report.analysis.server}:${report.analysis.port}</div>
+                    <div>${validation.analysis.server}:${validation.analysis.port}</div>
                     
-                    ${report.analysis.sni ? `
+                    ${validation.analysis.sni ? `
                         <div><strong>SNI:</strong></div>
-                        <div>${report.analysis.sni}</div>
+                        <div>${validation.analysis.sni}</div>
                     ` : ''}
                 </div>
             </div>
 
             <!-- Errors -->
-            ${report.errors.length > 0 ? `
+            ${validation.errors.length > 0 ? `
                 <div style="margin-bottom: 20px; padding: 15px; background: #2d1a1a; border-radius: 5px; border-left: 4px solid #dc3545;">
                     <h4 style="margin-bottom: 10px; color: #dc3545;">❌ Critical Errors</h4>
                     <ul style="margin: 0; padding-left: 20px;">
-                        ${report.errors.map(error => `<li>${error}</li>`).join('')}
+                        ${validation.errors.map(error => `<li>${error}</li>`).join('')}
                     </ul>
                 </div>
             ` : ''}
 
             <!-- Warnings -->
-            ${report.warnings.length > 0 ? `
+            ${validation.warnings.length > 0 ? `
                 <div style="margin-bottom: 20px; padding: 15px; background: #2d2a1a; border-radius: 5px; border-left: 4px solid #ffc107;">
                     <h4 style="margin-bottom: 10px; color: #ffc107;">⚠️ Warnings</h4>
                     <ul style="margin: 0; padding-left: 20px;">
-                        ${report.warnings.map(warning => `<li>${warning}</li>`).join('')}
+                        ${validation.warnings.map(warning => `<li>${warning}</li>`).join('')}
                     </ul>
                 </div>
             ` : ''}
 
             <!-- Suggestions -->
-            ${report.suggestions.length > 0 ? `
+            ${validation.suggestions.length > 0 ? `
                 <div style="margin-bottom: 20px; padding: 15px; background: #1a2d1a; border-radius: 5px; border-left: 4px solid #28a745;">
                     <h4 style="margin-bottom: 10px; color: #28a745;">💡 Suggestions</h4>
                     <ul style="margin: 0; padding-left: 20px;">
-                        ${report.suggestions.map(suggestion => `<li>${suggestion}</li>`).join('')}
+                        ${validation.suggestions.map(suggestion => `<li>${suggestion}</li>`).join('')}
                     </ul>
                 </div>
             ` : ''}
 
             <!-- Timestamp -->
             <div style="text-align: center; color: #666; font-size: 0.8rem; margin-top: 20px;">
-                Validated at: ${new Date(report.timestamp).toLocaleString()}
+                Validated at: ${new Date(validation.timestamp).toLocaleString()}
             </div>
         </div>
     `;
+}
+
+function generateConnectionHTML(connectionReport) {
+    const statusColor = connectionReport.status === 'success' ? '#28a745' :
+                       connectionReport.status === 'warning' ? '#ffc107' : '#dc3545';
+    
+    const statusIcon = connectionReport.status === 'success' ? '✅' :
+                      connectionReport.status === 'warning' ? '⚠️' : '❌';
+
+    return `
+        <div style="margin-bottom: 20px; padding: 15px; background: #1a1a1a; border-radius: 5px; border-left: 4px solid ${statusColor};">
+            <h4 style="margin-bottom: 10px;">🔗 Connection Test Results</h4>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 0.9rem;">
+                <div><strong>Status:</strong></div>
+                <div>${statusIcon} ${connectionReport.summary}</div>
+                
+                <div><strong>Details:</strong></div>
+                <div>${connectionReport.details}</div>
+                
+                ${connectionReport.latency ? `
+                    <div><strong>Latency:</strong></div>
+                    <div>${connectionReport.latency}ms</div>
+                ` : ''}
+                
+                ${connectionReport.nodesTested ? `
+                    <div><strong>Nodes Tested:</strong></div>
+                    <div>${connectionReport.nodesTested} locations</div>
+                ` : ''}
+                
+                ${connectionReport.successRate ? `
+                    <div><strong>Success Rate:</strong></div>
+                    <div>${Math.round(connectionReport.successRate)}%</div>
+                ` : ''}
+                
+                <div><strong>Method:</strong></div>
+                <div>${connectionReport.method === 'external_api' ? '🌐 Multi-region API' : '🔧 Basic Test'}</div>
+            </div>
+        </div>
+    `;
+}
+
+function calculateOverallScore(validationReport, connectionReport) {
+    if (!validationReport.isValid) return 0;
+    
+    let score = validationReport.score;
+    
+    // Adjust score based on connection test results
+    if (connectionReport) {
+        if (connectionReport.overall === 'healthy') {
+            score += 10; // Bonus for good connection
+        } else if (connectionReport.overall === 'port_unreachable') {
+            score -= 20; // Penalty for port issues
+        } else if (connectionReport.overall === 'host_unreachable') {
+            score = 0; // Config is useless if host unreachable
+        }
+    }
+    
+    return Math.max(0, Math.min(100, score));
 }
 
 export function generateConfigPreview(config) {
