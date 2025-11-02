@@ -1,87 +1,105 @@
-# .github/workflows/update-sni.yml
-name: Auto-Update SNI List
+name: Auto-Update SNI List (ZeroTier/Free Data Focus)
 
 on:
   schedule:
-    - cron: '0 2 * * *'   # daily 02:00 UTC
-  workflow_dispatch:      # manual button
+    - cron: '0 2 * * *'  # Daily at 2 AM UTC
+  workflow_dispatch:  # Manual trigger
 
 jobs:
   update:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          ref: main
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
 
-      - name: Install deps
-        run: pip install requests beautifulsoup4 lxml
+      - name: Install dependencies
+        run: |
+          pip install requests beautifulsoup4 lxml
 
-      - name: Scan & Append
+      - name: Scan & Update SNI List
         id: scan
         run: |
-          python - <<'PY'
-          import requests, re, json, os
+          python -c "
+          import requests
           from bs4 import BeautifulSoup
+          import re
           from datetime import datetime
 
-          FILE = 'sni-list.txt'
-          existing = set()
-          with open(FILE) as f:
-              for line in f:
-                  line = line.strip()
-                  if line and not line.startswith('#'):
-                      existing.add(line)
+          # Read existing list
+          with open('sni-list.txt', 'r') as f:
+              existing = set(line.strip() for line in f if line.strip() and not line.startswith('#'))
 
-          new = []
+          new_domains = []
 
-          # 1. ZeroTier GitHub issues
-          r = requests.get('https://api.github.com/repos/zerotier/ZeroTierOne/issues?state=all&per_page=100')
-          for i in r.json():
-              txt = (i.get('title','') + ' ' + i.get('body','')).lower()
-              if any(k in txt for k in ['free data','malaysia','unifi','maxis']):
-                  new += re.findall(r'([a-z0-9-]+\.[a-z]{2,}\.[a-z]{2,})', txt)
+          # Scan 1: ZeroTier GitHub Issues
+          resp = requests.get('https://api.github.com/repos/zerotier/ZeroTierOne/issues?state=closed&per_page=100')
+          issues = resp.json()
+          for issue in issues:
+              title = issue['title'].lower()
+              body = issue.get('body') or ''
+              if 'free data' in title or 'malaysia' in title or 'unifi' in title:
+                  domains = re.findall(r'([a-z0-9-]+\.[a-z]{2,}\.[a-z]{2,})', body)
+                  new_domains.extend(domains)
 
-          # 2. ISP speed-test pages
-          for url in [
+          # Scan 2: Malaysia ISP Speedtest Pages
+          isps = [
               'https://www.unifi.com.my/speedtest',
               'https://www.maxis.com.my/speedtest',
               'https://www.celcom.com.my/speedtest'
-          ]:
+          ]
+          for url in isps:
               try:
-                  html = requests.get(url, timeout=8).text
-                  soup = BeautifulSoup(html, 'lxml')
-                  links = soup.find_all('a', href=True)
-                  new += re.findall(r'([a-z0-9-]+\.[a-z]{2,}\.[a-z]{2,})',
-                                   ' '.join(a['href'] for a in links))
+                  resp = requests.get(url, timeout=10)
+                  soup = BeautifulSoup(resp.text, 'lxml')
+                  links = [a.get('href') or '' for a in soup.find_all('a', href=True) if 'cdn' in (a.get('href') or '') or 'static' in (a.get('href') or '')]
+                  domains = re.findall(r'([a-z0-9-]+\.[a-z]{2,}\.[a-z]{2,})', ' '.join(links))
+                  new_domains.extend(domains)
               except:
                   pass
 
-          # 3. Reddit r/zerotier
-          r = requests.get('https://www.reddit.com/r/zerotier/search.json?q=free+data+malaysia&limit=10')
-          for p in r.json()['data']['children']:
-              new += re.findall(r'([a-z0-9-]+\.[a-z]{2,}\.[a-z]{2,})', p['data'].get('selftext',''))
+          # Scan 3: ZeroTier Reddit (free data threads)
+          try:
+              resp = requests.get('https://www.reddit.com/r/zerotier/search.json?q=free+data+malaysia&limit=10', headers={'User-Agent': 'PayloadMagic'})
+              posts = resp.json().get('data', {}).get('children', [])
+              for post in posts:
+                  body = post.get('data', {}).get('selftext', '')
+                  domains = re.findall(r'([a-z0-9-]+\.[a-z]{2,}\.[a-z]{2,})', body)
+                  new_domains.extend(domains)
+          except:
+              pass
 
-          # filter
-          candidates = {d for d in new if d not in existing and d.endswith(('.my','.com','.net','.org'))}
-          if candidates:
-              with open(FILE, 'a') as f:
-                  f.write('\n# Auto-added {}\n'.format(datetime.utcnow().isoformat()))
-                  for d in sorted(candidates):
+          # Filter & Add New
+          new_unique = [d for d in set(new_domains) if d not in existing and d.endswith(('.com', '.net', '.my', '.org'))]
+          if new_unique:
+              with open('sni-list.txt', 'a') as f:
+                  f.write('\n# Auto-Added ' + datetime.utcnow().isoformat() + '\n')
+                  for d in new_unique:
                       f.write(d + '\n')
-              print(f'Added {len(candidates)} domains')
+              print(f'Added {len(new_unique)} new domains: {new_unique[:5]}...')
           else:
-              print('No new domains')
-          PY
+              print('No new domains found')
+          "
 
-      - name: Commit & Push (or PR)
+      - name: Commit & Push
         if: steps.scan.outcome == 'success'
         run: |
           git config user.name "PayloadMagic Bot"
-          git config user.email "bot@payloadmagic"
+          git config user.email "bot@payloadmagic.com"
           git add sni-list.txt
-          git commit -m "Auto-update SNI list (+$(git diff --name-only HEAD~1 | wc -l) domains)" || exit 0
-          git push origin HEAD:main   # direct push (works without protection)
+          if git diff --staged --quiet; then
+            echo "No changes - skipping commit"
+          else
+            git commit -m "Auto-update SNI list: Added $(git diff --name-only HEAD~1 | wc -l) domains"
+            git push origin HEAD:main
+          fi
+
+      - name: Notify on Failure
+        if: failure()
+        run: echo "Scan failed - check logs"
