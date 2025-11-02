@@ -1,0 +1,87 @@
+# .github/workflows/update-sni.yml
+name: Auto-Update SNI List
+
+on:
+  schedule:
+    - cron: '0 2 * * *'   # daily 02:00 UTC
+  workflow_dispatch:      # manual button
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install deps
+        run: pip install requests beautifulsoup4 lxml
+
+      - name: Scan & Append
+        id: scan
+        run: |
+          python - <<'PY'
+          import requests, re, json, os
+          from bs4 import BeautifulSoup
+          from datetime import datetime
+
+          FILE = 'sni-list.txt'
+          existing = set()
+          with open(FILE) as f:
+              for line in f:
+                  line = line.strip()
+                  if line and not line.startswith('#'):
+                      existing.add(line)
+
+          new = []
+
+          # 1. ZeroTier GitHub issues
+          r = requests.get('https://api.github.com/repos/zerotier/ZeroTierOne/issues?state=all&per_page=100')
+          for i in r.json():
+              txt = (i.get('title','') + ' ' + i.get('body','')).lower()
+              if any(k in txt for k in ['free data','malaysia','unifi','maxis']):
+                  new += re.findall(r'([a-z0-9-]+\.[a-z]{2,}\.[a-z]{2,})', txt)
+
+          # 2. ISP speed-test pages
+          for url in [
+              'https://www.unifi.com.my/speedtest',
+              'https://www.maxis.com.my/speedtest',
+              'https://www.celcom.com.my/speedtest'
+          ]:
+              try:
+                  html = requests.get(url, timeout=8).text
+                  soup = BeautifulSoup(html, 'lxml')
+                  links = soup.find_all('a', href=True)
+                  new += re.findall(r'([a-z0-9-]+\.[a-z]{2,}\.[a-z]{2,})',
+                                   ' '.join(a['href'] for a in links))
+              except:
+                  pass
+
+          # 3. Reddit r/zerotier
+          r = requests.get('https://www.reddit.com/r/zerotier/search.json?q=free+data+malaysia&limit=10')
+          for p in r.json()['data']['children']:
+              new += re.findall(r'([a-z0-9-]+\.[a-z]{2,}\.[a-z]{2,})', p['data'].get('selftext',''))
+
+          # filter
+          candidates = {d for d in new if d not in existing and d.endswith(('.my','.com','.net','.org'))}
+          if candidates:
+              with open(FILE, 'a') as f:
+                  f.write('\n# Auto-added {}\n'.format(datetime.utcnow().isoformat()))
+                  for d in sorted(candidates):
+                      f.write(d + '\n')
+              print(f'Added {len(candidates)} domains')
+          else:
+              print('No new domains')
+          PY
+
+      - name: Commit & Push (or PR)
+        if: steps.scan.outcome == 'success'
+        run: |
+          git config user.name "PayloadMagic Bot"
+          git config user.email "bot@payloadmagic"
+          git add sni-list.txt
+          git commit -m "Auto-update SNI list (+$(git diff --name-only HEAD~1 | wc -l) domains)" || exit 0
+          git push origin HEAD:main   # direct push (works without protection)
