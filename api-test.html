@@ -14,9 +14,9 @@
             results.innerHTML = '<p>Testing API endpoints...</p>';
             
             const tests = [
-                { name: 'Ping Test', endpoint: '/check-ping', host: 'google.com' },
-                { name: 'TCP Test', endpoint: '/check-tcp', host: 'google.com:80' },
-                { name: 'HTTP Test', endpoint: '/check-http', host: 'https://google.com' }
+                { name: 'Ping Test', endpoint: '/check-ping?host=', host: 'google.com' },
+                { name: 'TCP Test', endpoint: '/check-tcp?', host: 'google.com:80' },
+                { name: 'HTTP Test', endpoint: '/check-http?', host: 'https://google.com' }
             ];
             
             for (const test of tests) {
