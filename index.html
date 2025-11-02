@@ -1,74 +1,155 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>VLESS Builder v3.2</title>
-  <style>
-    :root { --bg: #0d1117; --card: #161b22; --border: #30363d; --text: #58a6ff; --green: #238636; --red: #da3633; --gray: #8b949e; }
-    body { background: var(--bg); color: var(--text); font-family: 'Courier New', monospace; padding: 20px; }
-    .container { max-width: 700px; margin: 0 auto; }
-    h1 { color: white; margin-bottom: 10px; font-size: 1.6rem; }
-    .form { background: var(--card); padding: 18px; border-radius: 8px; border: 1px solid var(--border); margin-bottom: 20px; }
-    label { display: block; margin: 12px 0 6px; font-size: 0.9rem; color: var(--gray); }
-    input, select { width: 100%; padding: 10px; background: #0d1117; border: 1px solid var(--border); border-radius: 6px; color: white; font-family: inherit; }
-    .checkbox-group { display: flex; align-items: center; gap: 10px; margin-top: 5px; }
-    button { background: var(--green); color: white; border: none; padding: 12px 20px; border-radius: 6px; cursor: pointer; font-weight: bold; margin-top: 15px; width: 100%; }
-    button:hover { background: #2ea043; }
-    button:disabled { background: #30363d; cursor: not-allowed; }
-    .actions { display: flex; gap: 8px; margin-top: 10px; }
-    .actions button { width: auto; flex: 1; font-size: 0.85rem; }
-    #output { background: var(--card); border: 1px solid var(--border); padding: 16px; border-radius: 8px; min-height: 180px; white-space: pre-wrap; font-size: 0.9rem; overflow-y: auto; }
-    .success { color: #7ce38b; }
-    .fail { color: var(--red); }
-    .config { background: #000; padding: 10px; border-radius: 6px; margin-top: 10px; font-family: monospace; word-break: break-all; }
-    .disabled { opacity: 0.5; pointer-events: none; }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VLESS Config Stripper</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 10px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 30px;
+        }
+
+        .input-section {
+            margin-bottom: 30px;
+        }
+
+        textarea {
+            width: 100%;
+            height: 120px;
+            padding: 15px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-family: monospace;
+            font-size: 14px;
+            resize: vertical;
+        }
+
+        textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 5px;
+            transition: background 0.3s;
+        }
+
+        button:hover {
+            background: #5a6fd8;
+        }
+
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .output-section {
+            margin-top: 20px;
+        }
+
+        .output-box {
+            background: #f8f9fa;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 10px;
+            position: relative;
+        }
+
+        .output-content {
+            font-family: monospace;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+
+        .copy-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: #28a745;
+        }
+
+        .copy-btn:hover {
+            background: #218838;
+        }
+
+        .copy-btn.copied {
+            background: #17a2b8;
+        }
+
+        .error {
+            color: #dc3545;
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            padding: 10px;
+            border-radius: 5px;
+            margin-top: 10px;
+        }
+
+        .success {
+            color: #155724;
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            padding: 10px;
+            border-radius: 5px;
+            margin-top: 10px;
+        }
+    </style>
 </head>
 <body>
-  <div class="container">
-    <h1>VLESS Builder v3.2</h1>
-    <p><small>TLS / No TLS • IP Support • Ping Check • Reset</small></p>
+    <div class="container">
+        <h1>VLESS Config Stripper</h1>
+        
+        <div class="input-section">
+            <textarea 
+                id="configInput" 
+                placeholder="Paste your VLESS configuration here..."
+            ></textarea>
+            <button id="stripBtn">Strip Configuration</button>
+        </div>
 
-    <div class="form">
-      <label>Target Domain or IP</label>
-      <input type="text" id="domain" placeholder="unifi.com.my or 161.142.78.10" value="unifi.com.my" />
+        <div id="message"></div>
 
-      <label>Security</label>
-      <select id="security" onchange="toggleSNI()">
-        <option value="tls">TLS</option>
-        <option value="none">No TLS</option>
-      </select>
-
-      <div id="sniField">
-        <label>SNI (Spoof, required for TLS)</label>
-        <input type="text" id="sni" placeholder="www.speedtest.net" value="www.speedtest.net" />
-      </div>
-
-      <label>Host Header (optional) <span class="checkbox-group"><input type="checkbox" id="pingCheck"> Ping + Alive?</span></label>
-      <input type="text" id="hostHeader" placeholder="Leave empty = domain" />
-
-      <label>UUID</label>
-      <input type="text" id="uuid" placeholder="Paste or generate" value="a1b2c3d4-e5f6-7890-g1h2-i3j4k5l6m7n8" />
-
-      <label>Port (default 443)</label>
-      <input type="text" id="port" placeholder="443" value="443" />
-
-      <button onclick="runFullTest()" id="testBtn">Test + Build</button>
-      <button onclick="resetForm()" id="resetBtn">Reset All</button>
+        <div class="output-section" id="outputSection" style="display: none;">
+            <h3>Stripped Configuration:</h3>
+            <div class="output-box">
+                <div class="output-content" id="strippedConfig"></div>
+                <button class="copy-btn" id="copyBtn">Copy</button>
+            </div>
+        </div>
     </div>
 
-    <div id="resultSection" style="display:none;">
-      <div class="config" id="vlessConfig"></div>
-      <div class="actions">
-        <button onclick="copyConfig()">Copy</button>
-        <button onclick="testVlessLink()">Open in Nekobox</button>
-      </div>
-    </div>
-
-    <pre id="output">Ready. Choose TLS or No TLS.</pre>
-  </div>
-
-  <script src="scan.js"></script>
+    <script src="scan.js"></script>
 </body>
 </html>
