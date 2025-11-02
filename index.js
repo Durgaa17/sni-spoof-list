@@ -1,4 +1,4 @@
-// Import path configuration
+// index.js - Add validator to tools list
 import { MODULE_PATHS } from './path.js';
 
 class HomePage {
@@ -6,7 +6,6 @@ class HomePage {
         this.toolsGrid = document.getElementById('toolsGrid');
         this.contentArea = document.getElementById('contentArea');
         
-        // Use paths from path.js - much cleaner!
         this.tools = [
             {
                 id: 'vless-stripper',
@@ -14,15 +13,14 @@ class HomePage {
                 icon: '⚡',
                 description: 'Strip VLESS configurations to basic parameters',
                 module: MODULE_PATHS.TOOLS.VLESS_STRIPPER
+            },
+            {
+                id: 'config-validator',                    // NEW TOOL!
+                title: 'Config Validator',
+                icon: '✅',
+                description: 'Validate VLESS configurations for errors and best practices',
+                module: MODULE_PATHS.TOOLS.CONFIG_VALIDATOR
             }
-            // Add new tools like this:
-            // {
-            //     id: 'config-validator',
-            //     title: 'Config Validator', 
-            //     icon: '✅',
-            //     description: 'Validate your configurations',
-            //     module: MODULE_PATHS.TOOLS.CONFIG_VALIDATOR
-            // }
         ];
         
         this.init();
@@ -42,7 +40,6 @@ class HomePage {
             </div>
         `).join('');
 
-        // Add event listeners to tool cards
         this.toolsGrid.querySelectorAll('.tool-card').forEach(card => {
             card.addEventListener('click', (e) => {
                 const toolId = e.currentTarget.getAttribute('data-tool');
@@ -67,7 +64,6 @@ class HomePage {
         if (!tool) return;
 
         try {
-            // Hide tools grid and show loading
             this.toolsGrid.style.display = 'none';
             this.contentArea.innerHTML = `
                 <div style="text-align: center; padding: 40px 0;">
@@ -76,26 +72,20 @@ class HomePage {
                 </div>
             `;
 
-            // Load the tool module using the path from configuration
             const module = await import('./' + tool.module);
-            
-            // Clear content
             this.contentArea.innerHTML = '';
-            
-            // Add back button
+
             const backBtn = document.createElement('button');
             backBtn.className = 'back-btn';
             backBtn.innerHTML = '← Back to Home';
             backBtn.onclick = () => this.showHome();
             this.contentArea.appendChild(backBtn);
 
-            // Initialize the tool
             if (module.default) {
                 module.default(this.contentArea);
             } else {
-                throw new Error('Tool module format is invalid');
+                throw new Error('Tool module must export a default function');
             }
-
         } catch (error) {
             console.error('Failed to load tool:', error);
             this.contentArea.innerHTML = `
@@ -117,7 +107,7 @@ class HomePage {
     }
 }
 
-// Initialize homepage when DOM is loaded
+// Initialize when DOM is ready
 let homePage;
 document.addEventListener('DOMContentLoaded', () => {
     homePage = new HomePage();
