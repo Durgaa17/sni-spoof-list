@@ -1,5 +1,7 @@
 # sni-spoof-list
 Sni list for Malaysian telco
+            DEMO
+https://durgaa17.github.io/sni-spoof-list/
 
 [![CI Validation](https://github.com/Durgaa17/sni-spoof-list/actions/workflows/ci.yml/badge.svg)](https://github.com/Durgaa17/sni-spoof-list/actions/workflows/ci.yml)
 
