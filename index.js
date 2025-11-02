@@ -1,0 +1,112 @@
+class HomePage {
+    constructor() {
+        this.toolsGrid = document.getElementById('toolsGrid');
+        this.contentArea = document.getElementById('contentArea');
+        this.tools = [
+            {
+                id: 'vless-stripper',
+                title: 'VLESS Stripper',
+                icon: '⚡',
+                description: 'Strip VLESS configurations to basic parameters',
+                module: 'stripper.js'
+            },
+            {
+                id: 'config-validator',
+                title: 'Config Validator',
+                icon: '✅',
+                description: 'Validate and test your configurations',
+                module: 'validator.js'
+            },
+            {
+                id: 'sni-checker',
+                title: 'SNI Checker',
+                icon: '🌐',
+                description: 'Check SNI and domain configurations',
+                module: 'sni-checker.js'
+            }
+        ];
+        
+        this.init();
+    }
+
+    init() {
+        this.loadToolsGrid();
+        this.showWelcome();
+    }
+
+    loadToolsGrid() {
+        this.toolsGrid.innerHTML = this.tools.map(tool => `
+            <div class="tool-card" onclick="homePage.loadTool('${tool.id}')">
+                <div class="tool-icon">${tool.icon}</div>
+                <div class="tool-title">${tool.title}</div>
+                <div class="tool-desc">${tool.description}</div>
+            </div>
+        `).join('');
+    }
+
+    showWelcome() {
+        this.contentArea.innerHTML = `
+            <div style="text-align: center; padding: 40px 0;">
+                <h2>Welcome to SNI Tools Hub</h2>
+                <p style="color: #888; margin-top: 10px;">
+                    Select a tool from the grid above to get started
+                </p>
+            </div>
+        `;
+    }
+
+    async loadTool(toolId) {
+        const tool = this.tools.find(t => t.id === toolId);
+        if (!tool) return;
+
+        try {
+            // Hide tools grid and show loading
+            this.toolsGrid.style.display = 'none';
+            this.contentArea.innerHTML = `
+                <div style="text-align: center; padding: 40px 0;">
+                    <div style="font-size: 2rem; margin-bottom: 20px;">⏳</div>
+                    <p>Loading ${tool.title}...</p>
+                </div>
+            `;
+
+            // Load the tool module
+            const module = await import(`./${tool.module}`);
+            
+            // Clear content and let the module render its UI
+            this.contentArea.innerHTML = '';
+            
+            // Add back button
+            const backBtn = document.createElement('button');
+            backBtn.className = 'back-btn';
+            backBtn.innerHTML = '← Back to Home';
+            backBtn.onclick = () => this.showHome();
+            this.contentArea.appendChild(backBtn);
+
+            // Initialize the tool
+            if (module.default) {
+                module.default(this.contentArea);
+            }
+
+        } catch (error) {
+            console.error('Failed to load tool:', error);
+            this.contentArea.innerHTML = `
+                <div style="text-align: center; padding: 40px 0; color: #ff6b6b;">
+                    <h3>Failed to load tool</h3>
+                    <p>${error.message}</p>
+                    <button class="back-btn" onclick="homePage.showHome()">Back to Home</button>
+                </div>
+            `;
+        }
+    }
+
+    showHome() {
+        this.toolsGrid.style.display = 'grid';
+        this.showWelcome();
+    }
+}
+
+// Initialize homepage when DOM is loaded
+let homePage;
+document.addEventListener('DOMContentLoaded', () => {
+    homePage = new HomePage();
+});
