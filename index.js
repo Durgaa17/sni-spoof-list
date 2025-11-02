@@ -1,4 +1,4 @@
-// index.js - Add validator to tools list
+// index.js - Main entry point for the SNI Tools Hub
 import { MODULE_PATHS } from './path.js';
 
 class HomePage {
@@ -6,6 +6,7 @@ class HomePage {
         this.toolsGrid = document.getElementById('toolsGrid');
         this.contentArea = document.getElementById('contentArea');
         
+        // Define all available tools using paths from path.js
         this.tools = [
             {
                 id: 'vless-stripper',
@@ -15,12 +16,13 @@ class HomePage {
                 module: MODULE_PATHS.TOOLS.VLESS_STRIPPER
             },
             {
-                id: 'config-validator',                    // NEW TOOL!
-                title: 'Config Validator',
+                id: 'config-validator',
+                title: 'Config Validator', 
                 icon: '✅',
                 description: 'Validate VLESS configurations for errors and best practices',
                 module: MODULE_PATHS.TOOLS.CONFIG_VALIDATOR
             }
+            // Add more tools here as needed
         ];
         
         this.init();
@@ -40,6 +42,7 @@ class HomePage {
             </div>
         `).join('');
 
+        // Add click listeners to tool cards
         this.toolsGrid.querySelectorAll('.tool-card').forEach(card => {
             card.addEventListener('click', (e) => {
                 const toolId = e.currentTarget.getAttribute('data-tool');
@@ -64,6 +67,7 @@ class HomePage {
         if (!tool) return;
 
         try {
+            // Hide grid and show loading
             this.toolsGrid.style.display = 'none';
             this.contentArea.innerHTML = `
                 <div style="text-align: center; padding: 40px 0;">
@@ -72,20 +76,26 @@ class HomePage {
                 </div>
             `;
 
+            // Dynamically import the tool module
             const module = await import('./' + tool.module);
+            
+            // Clear content area
             this.contentArea.innerHTML = '';
 
+            // Add back button
             const backBtn = document.createElement('button');
             backBtn.className = 'back-btn';
             backBtn.innerHTML = '← Back to Home';
             backBtn.onclick = () => this.showHome();
             this.contentArea.appendChild(backBtn);
 
+            // Initialize the tool (expects a default export function)
             if (module.default) {
                 module.default(this.contentArea);
             } else {
                 throw new Error('Tool module must export a default function');
             }
+
         } catch (error) {
             console.error('Failed to load tool:', error);
             this.contentArea.innerHTML = `
@@ -107,7 +117,7 @@ class HomePage {
     }
 }
 
-// Initialize when DOM is ready
+// Initialize the app when DOM is ready
 let homePage;
 document.addEventListener('DOMContentLoaded', () => {
     homePage = new HomePage();
