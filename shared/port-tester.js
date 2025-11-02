@@ -1,11 +1,12 @@
-// shared/port-tester.js - Protocol-aware testing
+// shared/port-tester.js - Enhanced with mixed content handling
 export async function testPortConnectivity(server, port, security = 'tls') {
     const results = {
         reachable: false,
         latency: null,
         error: null,
         protocol: security === 'tls' ? 'https' : 'http',
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        blockedByBrowser: false
     };
 
     try {
@@ -35,6 +36,14 @@ export async function testPortConnectivity(server, port, security = 'tls') {
         } catch (protocolError) {
             clearTimeout(timeoutId);
             
+            // Check if this is a mixed content error
+            if (isMixedContentError(protocolError, protocol)) {
+                results.blockedByBrowser = true;
+                results.error = `Mixed Content Blocked: Cannot test HTTP from HTTPS page`;
+                results.suggestion = 'Use Validate + Connection Test for HTTP port testing';
+                return results;
+            }
+            
             // If the preferred protocol fails, try the alternative
             const fallbackProtocol = protocol === 'https' ? 'http' : 'https';
             const fallbackUrl = `${fallbackProtocol}://${server}:${port}`;
@@ -60,8 +69,15 @@ export async function testPortConnectivity(server, port, security = 'tls') {
                 results.note = `Used ${fallbackProtocol} instead of ${protocol}`;
                 
             } catch (fallbackError) {
-                results.error = `Port ${port} not reachable via ${protocol} or ${fallbackProtocol}`;
-                results.details = getErrorDetails(fallbackError);
+                // Check if fallback also has mixed content error
+                if (isMixedContentError(fallbackError, fallbackProtocol)) {
+                    results.blockedByBrowser = true;
+                    results.error = `Mixed Content Blocked: Cannot test HTTP from HTTPS page`;
+                    results.suggestion = 'Use Validate + Connection Test for HTTP port testing';
+                } else {
+                    results.error = `Port ${port} not reachable via ${protocol} or ${fallbackProtocol}`;
+                    results.details = getErrorDetails(fallbackError);
+                }
             }
         }
 
@@ -76,14 +92,15 @@ export async function testPortConnectivity(server, port, security = 'tls') {
     return results;
 }
 
-// Enhanced WebSocket testing for WS configurations
+// Enhanced WebSocket testing with mixed content handling
 export async function testWebSocketConnectivity(server, port, security = 'tls', path = '/') {
     const results = {
         reachable: false,
         latency: null,
         error: null,
         protocol: 'websocket',
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        blockedByBrowser: false
     };
 
     try {
@@ -92,6 +109,14 @@ export async function testWebSocketConnectivity(server, port, security = 'tls', 
         const wsUrl = `${wsProtocol}://${server}:${port}${path}`;
         
         console.log(`Testing WebSocket connectivity to: ${wsUrl}`);
+
+        // Check for mixed content before attempting WebSocket
+        if (wsProtocol === 'ws' && window.location.protocol === 'https:') {
+            results.blockedByBrowser = true;
+            results.error = 'Mixed Content Blocked: Cannot test WS from HTTPS page';
+            results.suggestion = 'Use Validate + Connection Test for WebSocket testing';
+            return results;
+        }
 
         // WebSocket test with timeout
         const wsTest = new Promise((resolve, reject) => {
@@ -125,9 +150,29 @@ export async function testWebSocketConnectivity(server, port, security = 'tls', 
     return results;
 }
 
+function isMixedContentError(error, protocol) {
+    // Mixed content errors are tricky to detect directly, but we can infer:
+    const errorMessage = error.message.toLowerCase();
+    
+    // Common mixed content indicators
+    if (protocol === 'http' && window.location.protocol === 'https:') {
+        return true;
+    }
+    
+    if (errorMessage.includes('mixed content') ||
+        errorMessage.includes('blocked by client') ||
+        errorMessage.includes('insecure') ||
+        errorMessage.includes('scheme')) {
+        return true;
+    }
+    
+    return false;
+}
+
 function getErrorDetails(error) {
     if (error.name === 'AbortError') return 'Request timed out';
     if (error.message.includes('CORS')) return 'CORS policy blocked the request';
     if (error.message.includes('Failed to fetch')) return 'Network error or domain not resolved';
+    if (error.message.includes('Mixed Content')) return 'Blocked by browser mixed content policy';
     return error.message;
 }
